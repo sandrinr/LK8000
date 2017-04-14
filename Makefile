@@ -1381,7 +1381,7 @@ rebuild:
 
 clean: cleani
 	@$(NQ)echo "  CLEAN   $(BIN)"
-	$(Q)$(FIND) $(BIN) $(IGNORE) \( -name '*.[oa]' -o -name '*.rsc' -o -name '.*.d' -o -name '*.min.*'  -o -name '*.png' \) -type f -print | xargs -r $(RM)
+	$(Q)$(FIND) $(BIN) $(IGNORE) \( -name '*.[oa]' -o -name '*.rsc' -o -name '.*.d' -o -name '*.min.*'  -o -name '*.png' \) -type f -delete
 	$(Q)$(RM) -rf $(BIN)
 	$(Q)$(RM) $(OUTPUTS_NS)
 	$(Q)$(RM) $(OUTPUTS)
@@ -1391,7 +1391,7 @@ clean: cleani
 
 cleani:
 	@$(NQ)echo "  CLEANI"
-	$(Q)$(FIND) . $(IGNORE) \( -name '*.i' \) -type f -print | xargs -r $(RM)
+	$(Q)$(FIND) . $(IGNORE) \( -name '*.i' \) -type f -delete
 
 tags:
 	@$(NQ)echo "  TAGS"
