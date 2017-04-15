@@ -9,7 +9,7 @@ RUN true && \
     apt-get update && \
     apt-get install -y --no-install-recommends sudo rsync wget \
         ca-certificates pkg-config build-essential crossbuild-essential-armhf \
-        xsltproc imagemagick ttf-dejavu fakeroot zip && \
+        gawk xsltproc imagemagick ttf-dejavu fakeroot zip && \
     mkdir /lk8000 && chown nobody:nogroup /lk8000 && \
     chmod 0755 /usr/local/bin/entrypoint.sh && \
     apt-get clean && \

@@ -19,15 +19,17 @@ SYSROOT = $(shell $(CC) -print-sysroot)
 #   versions
 KOBO_SYS_LIB_NAMES = \
 	libstdc++.so.6 \
-	libm.so.6 \
-	ld-linux-armhf.so.3 \
-	libc.so.6 \
 	libgcc_s.so.1 \
-	librt.so.1 \
-	libpthread.so.0	\
 
 KOBO_SYS_LIB_PATHS = $(addprefix $(SYSROOT)/lib/,$(KOBO_SYS_LIB_NAMES))
 
+# Use our compiled version of glibc because the one shopped with the cross
+# toolchain does not support the Kobo kernel anymore
+KOBO_SYS_LIB_PATHS += $(KOBO)/lib/libc.so.6
+KOBO_SYS_LIB_PATHS += $(KOBO)/lib/libm.so.6
+KOBO_SYS_LIB_PATHS += $(KOBO)/lib/ld-linux-armhf.so.3
+KOBO_SYS_LIB_PATHS += $(KOBO)/lib/librt.so.1
+KOBO_SYS_LIB_PATHS += $(KOBO)/lib/libpthread.so.0
 KOBO_SYS_LIB_PATHS += $(KOBO)/lib/libzzip-0.so.13
 KOBO_SYS_LIB_PATHS += $(KOBO)/lib/libz.so.1
 KOBO_SYS_LIB_PATHS += $(KOBO)/lib/libpng16.so.16
