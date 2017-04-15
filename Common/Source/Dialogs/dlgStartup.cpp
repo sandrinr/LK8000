@@ -69,7 +69,16 @@ static bool OnTimerNotify(WndForm* pWnd) {
     return true;
 }
 
-
+#ifdef KOBO
+static int NumDialogInvocations = 0;
+static bool OnNoActionTimeoutNotify(WndForm* pWnd) {
+    if(NumDialogInvocations < 2 && pWnd) {
+        RUN_MODE = RUN_FLY;
+        pWnd->SetModalResult(mrOK);
+    }
+    return true;
+}
+#endif
 
 // Syntax  hdc _Text linenumber fontsize 
 // lines are: 0 - 9
@@ -815,6 +824,11 @@ short dlgStartupShowModal(void) {
 
     // Standby for a system request to close the application during this phase.
     wf->SetTimerNotify(500, OnTimerNotify);
+#ifdef KOBO
+    // Startup in fly mode if there is no input for some time
+    NumDialogInvocations++;
+    wf->SetTimerNotify(10000, OnNoActionTimeoutNotify);
+#endif
     if (wf->ShowModal() == mrCancel) {
         RUN_MODE = RUN_EXIT;
     }
