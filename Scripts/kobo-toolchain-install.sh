@@ -19,6 +19,18 @@ cd "$BUILD_DIR"
 #tar xJfC x-tools-arm-i386-2013-12-11.tar.xz /home/user
 #export PATH=/home/user/x-tools/arm-unknown-linux-gnueabi/bin:$PATH
 
+# install glibc
+wget http://mirror.netcologne.de/gnu/libc/glibc-2.23.tar.gz
+tar -xf glibc-2.23.tar.gz
+mkdir glibcbuild
+cd glibcbuild
+../glibc-2.23/configure --host=$TC --target=$TC --prefix=/opt/kobo/arm-unknown-linux-gnueabi --enable-static-nss --enable-kernel=2.6.35 --disable-werror --disable-build-nscd --disable-nscd
+make
+sudo make install
+cd ..
+# Fix headers
+sed -i 's%// .*%%' /opt/kobo/arm-unknown-linux-gnueabi/include/bits/string3.h
+
 # install zlib ( 1.2.11 - 2017-01-15)
 wget http://zlib.net/zlib-1.2.11.tar.gz
 tar -xvzf zlib-1.2.11.tar.gz
