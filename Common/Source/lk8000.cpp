@@ -702,6 +702,15 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    // When starting up in fly mode as a paraglider then enable screen lock
+    // to prevent unwanted device input from gear or lines
+    if (ISPARAGLIDER && RUN_MODE == RUN_FLY) {
+        if (LockMode(2)) {
+            DoStatusMessage(MsgToken(962)); // SCREEN IS LOCKED UNTIL TAKEOFF
+            DoStatusMessage(MsgToken(1601)); // DOUBLECLICK TO UNLOCK
+        }
+    }
+
  //
  // Main message loop
  //
