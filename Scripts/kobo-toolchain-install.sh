@@ -8,7 +8,7 @@
 
 set -ex
 
-[ -z "$TC"] && TC=arm-unknown-linux-gnueabi
+[ -z "$TC" ] && TC=arm-unknown-linux-gnueabi
 [ -z "$BUILD_DIR" ] && BUILD_DIR=~/tmp
 
 mkdir "$BUILD_DIR"
