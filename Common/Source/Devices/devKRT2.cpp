@@ -85,8 +85,8 @@ int  SetKRT2Station(uint8_t *Command ,int Active_Passive, double fFrequency, TCH
 unsigned int len = 8;
 unsigned int i;
 unsigned char MHz= (unsigned char) fFrequency;
-unsigned char kHz= (unsigned char) (fFrequency *1000.0 - MHz *1000  + 0.5);
-int Chan = kHz/5;
+unsigned int kHz= (unsigned int) (fFrequency *1000.0 - MHz *1000  + 0.5);
+unsigned char Chan = (unsigned char)(kHz/5);
 
 char Airfield[10]={"   ---   "};
 
@@ -284,14 +284,14 @@ BOOL KRT2RadioMode(PDeviceDescriptor_t d, int mode) {
 
 
 BOOL KRT2RequestAllData(PDeviceDescriptor_t d) {
-  TCHAR  szTmp[255];
+/*  TCHAR  szTmp[255];
 
   LockComm();
   if(d != NULL)
     if(!d->Disabled)
       if (d->Com)
         d->Com->WriteString(szTmp);
-  UnlockComm();
+  UnlockComm();*/
   return(TRUE);
 }
 
@@ -384,7 +384,7 @@ int processed=0;
 static int iDetected = 0;
 static bool bFound = false;
 
-
+static int counter =0;
 
 int i;
 LKASSERT(szCommand !=NULL);
@@ -392,6 +392,7 @@ LKASSERT(d !=NULL);
 
     if(szCommand[0] == 'S')
     {
+      if(uiKRT2DebugLevel) StartupStore(_T("KRT2 heartbeat: #%i %s"),counter++ ,NEWLINE);
       d->Com->WriteString(_T("x"));
       if(bFound == false)
       {
@@ -553,10 +554,11 @@ LKASSERT(d !=NULL);
             RadioPara.lowBAT = false;
           break;
           case 'J':  _stprintf(szTempStr,_T("RX_ON"));
-            RadioPara.RX_active = true;
+          
           break;
           case 'V':  _stprintf(szTempStr,_T("RX_OFF"));
             RadioPara.RX_active = false;
+            RadioPara.RX_standy = false;
           break;
           case 'K':  _stprintf(szTempStr,_T("TX_ON"));
             RadioPara.TX= true;
@@ -566,8 +568,6 @@ LKASSERT(d !=NULL);
 
           case 'Y': _stprintf(szTempStr,_T("RX_TX_OFF"));
             RadioPara.TX= false;
-            RadioPara.RX_active = false;
-            RadioPara.RX_standy = false;
           break;
           case 'M':  _stprintf(szTempStr,_T("RX_AF"));
             RadioPara.RX_active = true;
