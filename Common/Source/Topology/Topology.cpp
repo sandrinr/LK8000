@@ -19,6 +19,8 @@
 #include <Poco/TextConverter.h>
 
 #include "../Draw/ScreenProjection.h"
+#include "utils/stringext.h"
+#include "utils/tstring.h"
 
 #ifdef ENABLE_OPENGL
 #include "OpenGL/GLShapeRenderer.h"
@@ -673,7 +675,7 @@ void Topology::Paint(LKSurface& Surface, const RECT& rc, const ScreenProjection&
   Surface.SelectObject(hfOld);
 }
 
-TopologyLabel::TopologyLabel(const TCHAR* shpname, int field1):Topology(shpname) 
+TopologyLabel::TopologyLabel(const TCHAR* shpname, int field1):Topology(shpname),bUTF8()
 {
   setField(max(0,field1)); 
 };
@@ -692,7 +694,7 @@ XShape* TopologyLabel::addShape(const int i) {
   XShapeLabel* theshape = new XShapeLabel();
   LKASSERT(theshape);
   theshape->load(&shpfile,i);
-  theshape->setlabel(msDBFReadStringAttribute( shpfile.hDBF, i, field));
+  theshape->setlabel(msDBFReadStringAttribute( shpfile.hDBF, i, field),bUTF8);
   return theshape;
 }
 
@@ -800,7 +802,7 @@ bool XShapeLabel::renderSpecial(LKSurface& Surface, int x, int y, const RECT& Cl
 }
 
 
-void XShapeLabel::setlabel(const char* src) {
+void XShapeLabel::setlabel(const char* src, bool bUTF8) {
   // Case1 : NULL or not informative label, we show the shape without label
   if ( 
       (src == NULL) ||
@@ -835,29 +837,56 @@ void XShapeLabel::setlabel(const char* src) {
   }
 
 #ifdef UNICODE
-    // from Latin1 (ANSI) To UNICODE
-    int nChars = MultiByteToWideChar(CP_ACP, 0, src, -1, NULL, 0);
-    if (nChars) {
-        label = (TCHAR*) malloc(nChars * sizeof (TCHAR));
-        if (label) {
-            MultiByteToWideChar(CP_ACP, 0, src, -1, label, nChars);
-        }
+
+    if ( bUTF8 ) {
+      // from utf-8 to UNICODE
+      size_t size = strlen(src);
+      if(size) {
+        label = (TCHAR*) malloc(size * sizeof (TCHAR) + 1);
+        utf2TCHAR(src, label, size);
+      }
     }
+    else {
+      // from Latin1 (ANSI) To UNICODE
+      int nChars = MultiByteToWideChar(CP_ACP, 0, src, -1, NULL, 0);
+      if (nChars) {
+          label = (TCHAR*) malloc(nChars * sizeof (TCHAR));
+          if (label) {
+              MultiByteToWideChar(CP_ACP, 0, src, -1, label, nChars);
+          }
+      }
+    }
+
+
 #else
-    // from Latin1 (ISO-8859-1) To Utf8
-    std::tstring Latin1String(src);
-    std::tstring utf8String;
 
-    Poco::Latin1Encoding Latin1Encoding;
-    Poco::UTF8Encoding utf8Encoding;
 
-    Poco::TextConverter converter(Latin1Encoding, utf8Encoding);
-    converter.convert(Latin1String, utf8String);
-    size_t size = utf8String.size();
-    if(size) {
+    if ( bUTF8 ) {
+      // do simple copy 
+      size_t size = strlen(src);
+      if(size) {
+        label = (TCHAR*) malloc(size * sizeof (TCHAR) + 1);
+        strcpy(label, src);
+      }
+    }
+    else {
+      std::tstring Latin1String(src);
+      std::tstring utf8String;
+
+      Poco::Latin1Encoding Latin1Encoding;
+      Poco::UTF8Encoding utf8Encoding;
+       
+      // from Latin1 (ISO-8859-1) To Utf8
+      Poco::TextConverter converter(Latin1Encoding, utf8Encoding);
+      converter.convert(Latin1String, utf8String);
+      size_t size = utf8String.size();
+      if(size) {
         label = (TCHAR*) malloc(size * sizeof (TCHAR) + 1);
         strcpy(label, utf8String.c_str());
+      }
     }
+
+
 #endif
   
   hide=false;
@@ -1034,4 +1063,3 @@ void Topology::SearchNearest(const rectObj& bounds) {
     } // switch type of shape
   } // for all shapes in this category
 } // Topology SearchNearest
-
