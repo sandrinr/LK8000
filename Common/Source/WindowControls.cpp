@@ -571,7 +571,18 @@ void DataFieldEnum::addEnumTextNoLF(const TCHAR *Text) {
   std::replace(szTmp.begin(), szTmp.end(), _T('\n'), _T(' '));
 
   const unsigned int idx = mEntries.size();
-  mEntries.push_back({idx, std::move(szTmp)});
+  mEntries.push_back({idx, std::move(szTmp), _T("")});
+}
+
+int DataFieldEnum::Find(const TCHAR *Text) {
+  const auto it = std::find_if(mEntries.begin(), mEntries.end(), [Text](const DataFieldEnumEntry &item) {
+    return (item.mText.compare(Text) == 0);
+  });
+
+  if(it != mEntries.end()) {
+    return it->index;
+  }
+  return -1;
 }
 
 const TCHAR *DataFieldEnum::GetAsString(void) {
@@ -1365,40 +1376,66 @@ WindowControl *WindowControl::GetCanFocus(void) {
 
 void WindowControl::CalcChildRect(int& x, int& y, int& cx, int& cy) const {
     
-    // use negative value to space down items
-    // -999 to stay on the same line
-    // -998 to advance one line with spacing IBLSCALE 3
-    // -997 to advance one line with spacing IBLSCALE 6
-    // -991 advance with spacing IBLSCALE 1
-    // -992 advance with spacing IBLSCALE 2
-    // other -n   advance exactly height*n . 
+    // use negative value to space down or right items
+    // -999 to stay on the same line or column
+    // -998 to advance one line or column with spacing IBLSCALE 3
+    // -997 to advance one line or column with spacing IBLSCALE 6
+    // -991 to advance one or column line with spacing IBLSCALE 1
+    // -992 to advance one or column line with spacing IBLSCALE 2
+    // other -n   advance exactly ((height or width) * n). 
 
-    if (y < 0 && !mClients.empty()) {
+    if (!mClients.empty()) {
+      if (y < 0) {
         WindowControl * pPrev = mClients.back();
         switch (y) {
             case -999: //@ 101008
                 y = pPrev->GetTop();
                 break;
             case -998: //@ 101115
-                y = (pPrev->GetTop() + pPrev->GetHeight() + DLGSCALE(3));
+                y = (pPrev->GetBottom() + DLGSCALE(3));
                 break;
             case -997: //@ 101115
-                y = (pPrev->GetTop() + pPrev->GetHeight() + DLGSCALE(6));
+                y = (pPrev->GetBottom() + DLGSCALE(6));
                 break;
             case -992: 
-                y = (pPrev->GetTop() + pPrev->GetHeight() + DLGSCALE(2));
+                y = (pPrev->GetBottom() + DLGSCALE(2));
                 break;
             case -991: 
-                y = (pPrev->GetTop() + pPrev->GetHeight() + DLGSCALE(1));
+                y = (pPrev->GetBottom() + DLGSCALE(1));
                 break;
             default:
                 y = (pPrev->GetTop() - ((pPrev->GetHeight()) * y));
                 break;
+          }
+      }
+      if (x < 0) {
+        WindowControl * pPrev = mClients.back();
+        switch (x) {
+            case -999: //@ 101008
+                x = pPrev->GetRight();
+                break;
+            case -998: //@ 101115
+                x = (pPrev->GetRight() + DLGSCALE(3));
+                break;
+            case -997: //@ 101115
+                x = (pPrev->GetRight() + DLGSCALE(6));
+                break;
+            case -992: 
+                x = (pPrev->GetRight() + DLGSCALE(2));
+                break;
+            case -991: 
+                x = (pPrev->GetRight() + DLGSCALE(1));
+                break;
+            default:
+                x = (pPrev->GetRight() - ((pPrev->GetWidth()) * x));
+                break;
         }
-    }    
+      }
+    }
+
     if(y<0) y = 0;
     if(x<0) x = 0;
-    
+
     // negative value for cx is right margin relative to parent;
     if (cx<0) {
         cx = GetWidth() - x + cx;
@@ -1583,9 +1620,6 @@ void WindowControl::PaintSelector(LKSurface& Surface){
 #endif
 }
 
-extern void dlgHelpShowModal(const TCHAR* Caption, const TCHAR* HelpText);
-
-
 int WindowControl::OnHelp() {
     if (mHelpText) {
       dlgHelpShowModal(GetWndText(), mHelpText);
@@ -1699,6 +1733,7 @@ WndForm::WndForm(const TCHAR *Name, const TCHAR *Caption,
   mOnTimerNotify = NULL;
   mOnKeyDownNotify = NULL;
   mOnKeyUpNotify = NULL;
+  mOnUser = NULL;
 
   mColorTitle = RGB_MENUTITLEBG;
 
@@ -2007,7 +2042,7 @@ void WndButton::LedSetOnOff(bool ledonoff) {
    mLedOnOff=ledonoff;
 }
 void WndButton::LedSetColor(unsigned short ledcolor) {
-   LKASSERT(ledcolor>=0 && ledcolor<MAXLEDCOLORS);
+   LKASSERT(ledcolor<MAXLEDCOLORS);
    mLedColor=ledcolor;
 }
 
@@ -2923,23 +2958,6 @@ bool WndFrame::OnLButtonDown(const POINT& Pos) {
   return false;
 }
 
-// JMW needed to support mouse/touchscreen
-bool WndFrame::OnLButtonUp(const POINT& Pos) {
-  if(mLButtonDown) {
-
-    if (mIsListItem && GetParent() != NULL) {
-
-      WndListFrame *wlf = ((WndListFrame *) GetParent());
-      if (wlf) {
-        RECT Rc = {};
-        wlf->SelectItemFromScreen(Pos.x, Pos.y, &Rc, false);
-      }
-    }
-    mLButtonDown = false;
-  }
-  return true;
-}
-
 void WndListFrame::SetItemIndexPos(int iValue)
 {
 int Total = mListInfo.ItemCount;
@@ -2983,7 +3001,11 @@ void WndListFrame::SetItemIndex(int iValue){
 }
 
 void WndListFrame::SelectItemFromScreen(int xPos, int yPos, RECT *rect, bool select) {
-  (void)xPos;
+   if (PtInRect(&rcScrollBar, {xPos, yPos})) {
+     // ignore if click inside scrollbar
+     return;
+   }
+  
   WindowControl * pChild = NULL;
   if(!mClients.empty()) {
       pChild = mClients.front();
@@ -2992,14 +3014,16 @@ void WndListFrame::SelectItemFromScreen(int xPos, int yPos, RECT *rect, bool sel
     int index = yPos / pChild->GetHeight(); // yPos is offset within ListEntry item!
 
     if ((index>=0)&&(index<mListInfo.BottomIndex)) {
-      if (!select) {
-        if (mOnListEnterCallback) {
-          mOnListEnterCallback(this, &mListInfo);
-        }
-        RedrawScrolled(false);
-      } else {
+      if(mListInfo.ItemIndex != index) {
         mListInfo.ItemIndex = index;
         RecalculateIndices(false);
+      } else {
+        if(!select) {
+          if (mOnListEnterCallback) {
+            mOnListEnterCallback(this, &mListInfo);
+          }
+          RedrawScrolled(false);
+        }
       }
     }
   }
@@ -3027,6 +3051,7 @@ bool WndListFrame::OnMouseMove(const POINT& Pos) {
       if(newIndex != mListInfo.ScrollIndex) {
         mListInfo.ScrollIndex = newIndex;
         mScrollStart = Pos;
+        mCaptureScroll = true;
       }
       Redraw();
     }
@@ -3036,6 +3061,8 @@ bool WndListFrame::OnMouseMove(const POINT& Pos) {
 
 bool WndListFrame::OnLButtonDown(const POINT& Pos) {
   mMouseDown=true;
+  mCaptureScroll = false;
+  SetCapture();
   if (PtInRect(&rcScrollBarButton, Pos))  // see if click is on scrollbar handle
   {
     mMouseScrollBarYOffset = max(0, (int)Pos.y - (int)rcScrollBarButton.top);  // start mouse drag
@@ -3063,16 +3090,17 @@ bool WndListFrame::OnLButtonUp(const POINT& Pos) {
   ReleaseCapture();
 
   if(mMouseDown) {
+    mMouseDown=false;
     if(!mCaptureScrollButton) {
 
       if (!mClients.empty()) {
         RECT Rc = {};
-        SelectItemFromScreen(Pos.x, Pos.y, &Rc, true);
+        SelectItemFromScreen(Pos.x, Pos.y, &Rc, mCaptureScroll);
         mClients.front()->SetFocus();
       }
     }
-    mMouseDown=false;
   }
+  mCaptureScroll = false;
   mCaptureScrollButton = false;
   return true;
 }

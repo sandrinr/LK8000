@@ -30,8 +30,6 @@ import android.os.Build;
 import android.content.Context;
 import android.content.Intent;
 import android.provider.Settings;
-import android.location.GpsSatellite;
-import android.location.GpsStatus;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
@@ -85,21 +83,26 @@ public class InternalGPS
     index = _index;
     _context = context;
 
-    locationManager = (LocationManager)context.getSystemService(Context.LOCATION_SERVICE);
-    if (locationManager == null ||
-        locationManager.getProvider(locationProvider) == null) {
+    try {
+      locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
+      if (locationManager == null ||
+              locationManager.getProvider(locationProvider) == null) {
       /* on the Nook Simple Touch, LocationManager.isProviderEnabled()
          can crash, but LocationManager.getProvider() appears to be
          safe, therefore we're first checking the latter; if the
          device does have a GPS, it returns non-null even when the
          user has disabled GPS */
+        locationProvider = null;
+      } else if (!locationManager.isProviderEnabled(locationProvider) &&
+              !queriedLocationSettings) {
+        // Let user turn on GPS, XCSoar is not allowed to.
+        Intent myIntent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+        context.startActivity(myIntent);
+        queriedLocationSettings = true;
+      }
+    } catch (Exception e) {
       locationProvider = null;
-    } else if (!locationManager.isProviderEnabled(locationProvider) &&
-        !queriedLocationSettings) {
-      // Let user turn on GPS, XCSoar is not allowed to.
-      Intent myIntent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
-      context.startActivity(myIntent);
-      queriedLocationSettings = true;
+      Log.e(TAG, "GPS Unavailable", e);
     }
 
     windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
@@ -131,8 +134,7 @@ public class InternalGPS
         return;
       }
 
-      sensorManager.registerListener(this, accelerometer,
-                                     sensorManager.SENSOR_DELAY_NORMAL);
+      sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
 
       setConnectedSafe(1); // waiting for fix
 

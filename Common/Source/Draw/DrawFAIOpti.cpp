@@ -32,8 +32,6 @@ typedef RasterPoint ScreenPoint;
 
 #define MAX_FAI_SECTOR_PTS (8*FAI_SECTOR_STEPS)
 extern LKColor taskcolor;
-extern BOOL CheckFAILeg(double leg, double total);
-
 
 class AnalysisProjection {
 public:
@@ -289,10 +287,6 @@ Surface.SetBackgroundTransparent();
   hpSectorPen.Release();
 }
 
-
-
-extern BOOL CheckFAILeg(double leg, double total);
-
 void FAI_Sector::FreeFAISectorMem(void)
 {
   m_FAIGridLines.clear();
@@ -434,7 +428,7 @@ if (iOpposite >0)
   /********************************************************************
    * right  threshold extender 2
    ********************************************************************/
-if((fDist_c / FAI_NORMAL_PERCENTAGE) >= FAI28_45Threshold)
+if((fDist_c / FAI_NORMAL_PERCENTAGE) >= FAI28_45Threshold) {
   if(bBigFAISector && (fDistMin < FAI28_45Threshold))
   {
     fMaxLeg = FAI28_45Threshold*FAI_BIG_MAX_PERCENTAGE;
@@ -460,6 +454,7 @@ if((fDist_c / FAI_NORMAL_PERCENTAGE) >= FAI28_45Threshold)
       fDist_a += fDelta_Dist;
     }
   }
+}
   /********************************************************************
    * right  above threshold  3
    ********************************************************************/
@@ -570,7 +565,7 @@ if((fDist_c / FAI_NORMAL_PERCENTAGE) >= FAI28_45Threshold)
   /********************************************************************
    * LEFT threshold extender
    ********************************************************************/
-if((fDist_c / FAI_NORMAL_PERCENTAGE) >= FAI28_45Threshold)
+if((fDist_c / FAI_NORMAL_PERCENTAGE) >= FAI28_45Threshold) {
   if((fDistMin < FAI28_45Threshold) && (FAI28_45Threshold <= fDistMax) && (bBigFAISector))
   {
     fMaxLeg = FAI28_45Threshold*FAI_BIG_MAX_PERCENTAGE;
@@ -596,7 +591,7 @@ if((fDist_c / FAI_NORMAL_PERCENTAGE) >= FAI28_45Threshold)
       fDist_b += fDelta_Dist;
     }
   }
-
+}
 
   /********************************************************************
    * LEFT below threshold 7
@@ -844,7 +839,7 @@ int numlegs=0;
 #ifdef  FIVEPOINT_OPTIMIZER
 	 || (sType ==  CContestMgr::TYPE_FAI_TRIANGLE5)
 #endif
-	 ) && (iSize>0))
+	 ) && (iSize>2))
   {
     LKASSERT(iSize<100);
     LockTaskData(); // protect from external task changes

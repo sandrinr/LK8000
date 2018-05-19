@@ -94,7 +94,7 @@ typedef struct {
 	double latitude;                      // position
 	double longitude;                     // position
 	double alt;                           // altitude MSL [m]
-	double ground_speed;                  // GS [km/h]
+	double ground_speed;                  // GS [m/s]
 	double course_over_ground;            // Heading [deg]
 } livetracker_point_t;
 
@@ -1180,7 +1180,8 @@ static bool LiveTrack24_Radar() {
 
 		time_t rawtime = lastTM;
 		struct tm * ptm;
-		ptm = gmtime(&rawtime);
+        struct tm tm_temp = {0};
+        ptm = gmtime_r(&rawtime, &tm_temp);
 		int Time_Fix = (ptm->tm_hour * 3600 + ptm->tm_min * 60 + ptm->tm_sec);
 		if (Time_Fix > GPS_INFO.Time)
 			Time_Fix = GPS_INFO.Time;
@@ -1558,7 +1559,7 @@ static bool SendGPSPointPacket2(unsigned int *packet_id) {
 		LatList.push_back((int) std::floor((_t_points[i].latitude * 60000.)));
 		LonList.push_back((int) std::floor((_t_points[i].longitude * 60000.)));
 		AltList.push_back((int) _t_points[i].alt);
-		SOGlist.push_back((int) _t_points[i].ground_speed);
+		SOGlist.push_back((int) _t_points[i].ground_speed * 3.6 ) ;
 		COGlist.push_back((int) _t_points[i].course_over_ground);
 	}
 

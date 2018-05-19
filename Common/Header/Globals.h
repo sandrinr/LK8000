@@ -42,17 +42,13 @@
   extern void Globals_Init(void);
 #endif
 
-#ifdef GTL2
-GEXTERN pointObj GlideFootPrint2[NUMTERRAINSWEEPS+1];
-#endif
-
 #ifdef RADIO_ACTIVE
 typedef struct _Radio_t
 {
 	double ActiveFrequency;    //active station frequency
 	double PassiveFrequency;   // passive (or standby) station frequency
-	TCHAR PassiveName[30] ;    // passive (or standby) station name
-	TCHAR ActiveName[30] ;     //active station name
+	TCHAR PassiveName[NAME_SIZE] ;    // passive (or standby) station name
+	TCHAR ActiveName[NAME_SIZE] ;     //active station name
 	int Volume ;               // Radio Volume
 	int Squelch ;              // Radio Squelch
 	int Vox ;                  // Radio Intercom Volume
@@ -470,15 +466,6 @@ GEXTERN int CompassMenuSize;
 GEXTERN int time_in_flight;
 GEXTERN int time_on_ground;
 GEXTERN double TakeOffSpeedThreshold;
-
-// Com port diagnostic - see Utils2.h
-GEXTERN int ComPortStatus[NUMDEV+1];
-GEXTERN long ComPortRx[NUMDEV+1];
-GEXTERN long ComPortErrRx[NUMDEV+1];
-GEXTERN long ComPortTx[NUMDEV+1];
-GEXTERN long ComPortErrTx[NUMDEV+1];
-// Com ports hearth beats, based on LKHearthBeats
-GEXTERN unsigned ComPortHB[NUMDEV+1];
 
 GEXTERN double	NearestAirspaceHDist;
 GEXTERN double	NearestAirspaceVDist;

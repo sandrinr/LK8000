@@ -1,23 +1,51 @@
 #
+string_equals = $(if $(and $(findstring $(2),$(1)),$(findstring $(1),$(2))),y,n)
+string_contains = $(if $(findstring $(2),$(1)),y,n)
+
+UNAME_S := $(shell uname -s)
+UNAME_M := $(shell uname -m)
+
+HOST_IS_LINUX := $(call string_equals,$(UNAME_S),Linux)
+HOST_IS_ARM := $(call string_contains,$(UNAME_M),armv)
+HOST_IS_ARMV7 := $(call string_equals,$(UNAME_M),armv7l)
+
+ifeq ($(HOST_IS_ARMV7),y)
+ HOST_HAS_NEON := $(call string_contains,$(shell grep -E ^Features /proc/cpuinfo),neon)
+else
+ HOST_HAS_NEON := n
+endif
+
+ifeq ($(HOST_IS_LINUX)$(HOST_IS_ARM),yy)
+# Check for VideoCore headers present on a Raspberry Pi
+ HOST_IS_PI := $(call string_equals,$(shell test -f /opt/vc/include/interface/vmcs_host/vc_dispmanx.h && echo y),y)
+else
+ HOST_IS_PI := n
+endif
+
 SRC=Common/Source
-DEV=Common/Source/Devices
-DLG=Common/Source/Dialogs
-LIB=Common/Source/Library
-DRW=Common/Source/Draw
-MAP=Common/Source/MapDraw
-TOP=Common/Source/Topology
-SHP=Common/Source/Topology/shapelib
-TER=Common/Source/Terrain
-NTR=Common/Source/LKInterface
-CLC=Common/Source/Calc
-TSK=Common/Source/Calc/Task
-CMM=Common/Source/Comm
-WPT=Common/Source/Waypoints
-RSC=Common/Source/Resources
 HDR=Common/Header
+
+DEV=$(SRC)/Devices
+DLG=$(SRC)/Dialogs
+LIB=$(SRC)/Library
+DRW=$(SRC)/Draw
+MAP=$(SRC)/MapDraw
+TOP=$(SRC)/Topology
+SHP=$(TOP)/shapelib
+TER=$(SRC)/Terrain
+NTR=$(SRC)/LKInterface
+CLC=$(SRC)/Calc
+TSK=$(CLC)/Task
+CMM=$(SRC)/Comm
+WPT=$(SRC)/Waypoints
+RSC=$(SRC)/Resources
 SRC_SCREEN=$(SRC)/Screen
 SRC_WINDOW=$(SRC)/Window
 
+
+ifeq ($(TARGET),)
+ override TARGET=LINUX
+endif
 
 BIN=Bin/$(TARGET)
 
@@ -95,6 +123,8 @@ ifeq ($(TARGET),LINUX)
   CONFIG_ANDROID :=n
   MINIMAL        :=n
   OPENMP         :=y
+  TARGET_IS_PI   :=$(HOST_IS_PI)
+	
 endif
 
 ifeq ($(TARGET),KOBO)
@@ -106,7 +136,7 @@ ifeq ($(TARGET),KOBO)
 endif
 
 ifeq ($(TARGET),PI)
-  HOST_IS_PI     :=n
+  HOST_IS_PI     :=$(HOST_IS_PI)
   TARGET_IS_PI   :=y
   CONFIG_LINUX   :=y
   CONFIG_ANDROID :=n
@@ -149,8 +179,7 @@ else ifeq ($(CONFIG_WINE),y)
  MCPU   := -mcpu=$(CPU)
 else ifeq ($(TARGET_IS_KOBO),y)
  TCPATH := arm-unknown-linux-gnueabi-
- MCPU   := -march=armv7-a -mfpu=neon -mfloat-abi=hard -ftree-vectorize -mvectorize-with-neon-quad -ffast-math -funsafe-math-optimizations -funsafe-loop-optimizations
-else ifeq ($(TARGET_IS_PI),y)
+else ifeq ($(HOST_IS_PI)$(TARGET_IS_PI),ny)
  TCPATH := arm-linux-gnueabihf-
  MCPU   := -mtune=cortex-a7 -march=armv7-a -mfpu=neon-vfpv4 -mfloat-abi=hard -ftree-vectorize
 else ifeq ($(TARGET_IS_CUBIE),y)
@@ -158,6 +187,7 @@ else ifeq ($(TARGET_IS_CUBIE),y)
  MCPU   := -mtune=cortex-a7 -march=armv7-a -mfpu=neon-vfpv4 -mfloat-abi=hard
 else ifeq ($(CONFIG_LINUX),y)
  TCPATH :=
+ MCPU   := -mtune=native -march=native
 else
  TCPATH	:=arm-mingw32ce-
 endif
@@ -240,7 +270,7 @@ ifneq ($(TARGET),OPENVARIO)
  SIZE		:=$(TCPATH)size$(EXE)
  WINDRES	:=$(TCPATH)windres$(EXE)
  LD		:=$(TCPATH)ld$(EXE)
- OBJCOPY		:=$(TCPATH)objcopy$(EXE)
+ OBJCOPY	:=$(TCPATH)objcopy$(EXE)
 endif
 	
 SYNCE_PCP	:=synce-pcp
@@ -312,13 +342,19 @@ ifeq ($(TARGET_IS_PI),y)
  USE_SDL :=n
  USE_X11 :=n
  ENABLE_MESA_KMS :=n
+ USE_CONSOLE :=y
+
  CE_DEFS += -DUSE_VIDEOCORE
  CE_DEFS += -isystem $(PI)/opt/vc/include -isystem $(PI)/opt/vc/include/interface/vcos/pthreads
  CE_DEFS += -isystem $(PI)/opt/vc/include/interface/vmcs_host/linux
- USE_CONSOLE = y	
 
- CE_DEFS += --sysroot=$(PI) -isystem $(PI)/usr/include/arm-linux-gnueabihf -isystem $(PI)/usr/include 
-
+ ifneq ($(HOST_IS_PI),y)
+  CE_DEFS += --sysroot=$(PI) -isystem $(PI)/usr/include/arm-linux-gnueabihf -isystem $(PI)/usr/include 
+ endif
+ 
+ ifeq ($(HOST_HAS_NEON),y)
+  MCPU   := -mtune=cortex-a7 -march=armv7-a -mfpu=neon-vfpv4 -mfloat-abi=hard -ftree-vectorize
+ endif
 endif
 
 ifeq ($(TARGET_HAS_MALI),y)
@@ -326,7 +362,7 @@ ifeq ($(TARGET_HAS_MALI),y)
  OPENGL	 :=y
  GLES    :=y
  USE_X11 :=n
- USE_CONSOLE = y	
+ USE_CONSOLE :=y	
 	
  CE_DEFS += -DHAVE_MALI
 endif
@@ -370,14 +406,13 @@ ifeq ($(CONFIG_LINUX),y)
   endif
  endif
 
- ifeq ($(OPENGL)$(USE_EGL),yy)
-   EGL_LDLIBS += -lEGL
-    USE_X11 ?=$(shell $(PKG_CONFIG) --exists x11 && echo y)
-  USE_SDL ?=n
- endif
-
  ifeq ($(TARGET_IS_PI),y)
- EGL_LDLIBS += -L$(PI)/opt/vc/lib -lvchostif -lvchiq_arm -lvcos -lbcm_host
+  $(eval $(call pkg-config-library,BRCMEGL,brcmegl)) 
+  EGL_LDLIBS += $(BRCMEGL_LDLIBS)
+ else ifeq ($(OPENGL)$(USE_EGL),yy)
+  EGL_LDLIBS += -lEGL
+  USE_X11 ?=$(shell $(PKG_CONFIG) --exists x11 && echo y)
+  USE_SDL ?=n
  endif
 
  ifeq ($(USE_WAYLAND),y)
@@ -396,7 +431,7 @@ ifeq ($(CONFIG_LINUX),y)
   GBM_CPPFLAGS := $(patsubst -I%,-isystem %,$(GBM_CPPFLAGS))
   CE_DEFS += -DMESA_KMS $(DRM_CPPFLAGS) $(GBM_CPPFLAGS)
   EGL_LDLIBS += $(DRM_LDLIBS) $(GBM_LDLIBS)
-  USE_CONSOLE = y
+  USE_CONSOLE :=y
   USE_X11 = n
   USE_SDL = n
  else ifeq ($(USE_X11),y)
@@ -404,9 +439,9 @@ ifeq ($(CONFIG_LINUX),y)
   CE_DEFS += $(X11_CPPFLAGS) -DUSE_X11
  endif
 
+
  ifeq ($(USE_CONSOLE),y)
   CE_DEFS += -DUSE_CONSOLE
-
   USE_LIBINPUT ?= $(shell $(PKG_CONFIG) --exists libinput && echo y)
  endif
 
@@ -468,10 +503,21 @@ ifeq ($(CONFIG_LINUX),y)
 
   ifeq ($(GLES2),y)
    CE_DEFS += -DHAVE_GLES -DHAVE_GLES2 -DUSE_GLSL
-   OPENGL_LDLIBS = -lGLESv2 -ldl
+   ifeq ($(TARGET_IS_PI),y)
+    $(eval $(call pkg-config-library,OPENGL,brcmglesv2))
+    $(eval $(call pkg-config-library,GLM,glm))
+    OPENGL_LDLIBS += -ldl
+   else
+    OPENGL_LDLIBS = -lGLESv2 -ldl
+   endif
   else ifeq ($(GLES),y)
    CE_DEFS += -DHAVE_GLES
-   OPENGL_LDLIBS = -lGLESv1_CM -ldl
+   ifeq ($(TARGET_IS_PI),y)
+    $(eval $(call pkg-config-library,OPENGL,brcmglesv2))
+    OPENGL_LDLIBS += -ldl
+   else
+    OPENGL_LDLIBS = -lGLESv1_CM -ldl
+   endif
   else
    OPENGL_LDLIBS = -lGL
   endif
@@ -583,7 +629,7 @@ endif
 
 #CPPFLAGS	+= -Wchar-subscripts -Wformat -Winit-self -Wimplicit -Wmissing-braces -Wparentheses -Wreturn-type
 CPPFLAGS	+= -Wunused-label -Wunused-variable -Wunused-value -Wuninitialized
-
+CPPFLAGS	+= -Wredundant-decls
 CPPFLAGS	+= -Wall -Wno-char-subscripts -fsigned-char
 #CPPFLAGS	+= -Wall -Wno-char-subscripts -Wignored-qualifiers -Wunsafe-loop-optimizations 
 #CPPFLAGS	+= -Winit-self -Wswitch -Wcast-qual -Wcast-align
@@ -630,7 +676,7 @@ ifeq ($(TARGET_IS_KOBO),y)
  LDFLAGS += -Wl,--rpath=/opt/LK8000/lib
 endif
 
-ifeq ($(TARGET_IS_PI),y)
+ifeq ($(HOST_IS_PI)$(TARGET_IS_PI),ny)
  LDFLAGS		+= --sysroot=$(PI) -L$(PI)/usr/lib/arm-linux-gnueabihf
 endif
 
@@ -1130,6 +1176,7 @@ DEVS	:=\
 	$(DEV)/devLXV7easy.cpp \
 	$(DEV)/devLXV7_EXP.cpp \
 	$(DEV)/devPosiGraph.cpp \
+	$(DEV)/devVaulter.cpp \
 	$(DEV)/devVolkslogger.cpp \
 	$(DEV)/devXCOM760.cpp \
 	$(DEV)/devZander.cpp \
@@ -1593,7 +1640,7 @@ $(BIN)/%.o: $(SRC)/%.cpp
 	$(Q)$(CXX) $(cxx-flags) -c $(OUTPUT_OPTION) $<
 	@sed -i '1s,^[^ :]*,$@,' $(DEPFILE)
 
-$(BIN)/resource.a: $(BIN)/Resource/resource_data.o $(BIN)/Resource/resource_xml.o $(BITMAP_RES_O) 
+$(BIN)/resource.a: $(BIN)/Resource/resource_wave.o $(BIN)/Resource/resource_data.o $(BIN)/Resource/resource_xml.o $(BITMAP_RES_O) 
 	@$(NQ)echo "  AR      $@"
 	$(Q)$(AR) $(ARFLAGS) $@ $^
 
@@ -1611,6 +1658,12 @@ $(BIN)/Resource/resource_bmp.o:  $(BIN)/Resource/resource_bmp.png.S
 	@$(NQ)echo "  AS     $@"
 	$(Q)$(MKDIR) $(dir $@)
 	$(Q)$(AS) $(OUTPUT_OPTION) $<
+
+$(BIN)/Resource/resource_wave.o:  $(RSCSRC)/resource_wave.S
+	@$(NQ)echo "  AS     $@"
+	$(Q)$(MKDIR) $(dir $@)
+	$(Q)$(AS) $(OUTPUT_OPTION) $<
+
 
 $(BIN)/Resource/resource_bmp.png.S : $(RSCSRC)/resource_bmp.S $(patsubst Common/Data/Bitmaps/%.bmp,$(BIN)/Data/Bitmaps/%.png,$(BITMAP_RES))
 	@$(NQ)echo "  update $@"

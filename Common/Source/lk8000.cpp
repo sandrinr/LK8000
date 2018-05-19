@@ -30,6 +30,7 @@
 #include "devLX.h"
 #include "devLXMiniMap.h"
 #include "devLX16xx.h"
+#include "devVaulter.h"
 #include "devLXV7.h"
 #include "devLXV7_EXP.h"
 #include "devLXNano.h"
@@ -111,8 +112,6 @@ extern bool LoadModelFromProfile(void);
 
 #ifndef ANDROID
 Poco::NamedMutex Mutex("LOCK8000");
-#else
-zzip_file_ptr zzipSystem;
 #endif
 
 static bool realexitforced=false;
@@ -270,15 +269,7 @@ bool Startup(const TCHAR* szCmdLine) {
     }
   #endif
 
-#ifdef ANDROID
-  /** system files are stored in "assets"
-   * "assets" are zipped inside apk
-   * for speedup access to this files by zziplib, we need to keep it open...
-   */
-  TCHAR szSystemPath[MAX_PATH];
-  SystemPath(szSystemPath, TEXT(LKD_SYSTEM DIRSEP LKF_CREDITS));
-  zzipSystem = openzip(szSystemPath, "rb");
-#else
+#ifndef ANDROID
   bool datadir = CheckDataDir();
   if (!datadir) {
     // we cannot call startupstore, no place to store log!
@@ -376,8 +367,9 @@ bool Startup(const TCHAR* szCmdLine) {
 
   time_t  linux_time;
   linux_time = time(0);
+  tm utc_tm = {0};
   struct tm *pda_time;
-  pda_time = gmtime(&linux_time);
+  pda_time = gmtime_r(&linux_time, &utc_tm);
   GPS_INFO.Time  = pda_time->tm_hour*3600+pda_time->tm_min*60+pda_time->tm_sec;
   GPS_INFO.Year  = pda_time->tm_year + 1900;
   GPS_INFO.Month = pda_time->tm_mon + 1;
@@ -514,6 +506,7 @@ bool Startup(const TCHAR* szCmdLine) {
   AR620xRegister();
   ATR833Register();
 #endif  // RADIO_ACTIVE
+  DevVaulter::Register();
 
   // REPETITION REMINDER ..
   // IMPORTANT: ADD NEW ONES TO BOTTOM OF THIS LIST
@@ -561,7 +554,9 @@ bool Startup(const TCHAR* szCmdLine) {
   StartupStore(TEXT(".... ProgramStarted=InitDone%s"),NEWLINE);
   #endif
   ProgramStarted = psInitDone;
-
+#ifdef ENABLE_OPENGL
+  MainWindow.Invalidate();
+#endif
   GlobalRunning = true;
 	
 	InitAirspaceSonar();
@@ -612,6 +607,12 @@ void Shutdown() {
   MainWindow.Destroy();
   Message::Destroy();
 
+#if TESTBENCH
+  StartupStore(TEXT(".... Close Progress Dialog%s"),NEWLINE);
+#endif
+  CloseProgressDialog();
+
+
   DeInitLKFonts();
   LKObjects_Delete();
   LKUnloadProfileBitmaps();
@@ -624,8 +625,6 @@ void Shutdown() {
 
 #ifndef ANDROID
   Mutex.unlock();
-#else
-  zzipSystem.close();
 #endif
 
   #if TESTBENCH

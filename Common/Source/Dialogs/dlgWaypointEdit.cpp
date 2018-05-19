@@ -100,8 +100,8 @@ static void OnCommentClicked(WndButton* pWnd) {
 static void SetUnits(WndForm* wf) {
   WndProperty* wp;
   switch (Units::CoordinateFormat) {
-  case 0: // ("DDMMSS");
-  case 1: // ("DDMMSS.ss");
+  case cfDDMMSS: // ("DDMMSS");
+  case cfDDMMSSss: // ("DDMMSS.ss");
     wp = (WndProperty*)wf->FindByName(TEXT("prpLongitudeDDDD"));
     if (wp) {
       wp->SetVisible(false);
@@ -119,7 +119,7 @@ static void SetUnits(WndForm* wf) {
       wp->SetVisible(false);
     }
     break;
-  case 2: // ("DDMM.mmm");
+  case cfDDMMmmm: // ("DDMM.mmm");
     wp = (WndProperty*)wf->FindByName(TEXT("prpLongitudeDDDD"));
     if (wp) {
       wp->SetVisible(false);
@@ -137,7 +137,7 @@ static void SetUnits(WndForm* wf) {
       wp->SetVisible(false);
     }
     break;
-  case 3: // ("DD.dddd");
+  case cfDDdddd: // ("DD.dddd");
     wp = (WndProperty*)wf->FindByName(TEXT("prpLongitudeM"));
     if (wp) {
       wp->SetVisible(false);
@@ -164,8 +164,27 @@ static void SetUnits(WndForm* wf) {
       wp->SetVisible(false);
     }
     break;
-  case 4: // UTM (" 32T 123456 1234567 ")
+  case cfUTM: // UTM (" 32T 123456 1234567 ")
     break;
+  }
+
+  if(Units::CoordinateFormat == cfDDMMSSss) {
+    // change DisplayFormat, EditFormat and Step of DataField for allow imput of desimal seconds
+    for(const auto name : { TEXT("prpLongitudeS"), TEXT("prpLatitudeS") } ) {
+      wp = (WndProperty*)wf->FindByName(name);
+      if (wp) {
+        DataField* pDataField = wp->GetDataField();
+        if(pDataField) {
+            pDataField->SetDisplayFormat(TEXT("%.02fs"));
+            pDataField->SetEditFormat(TEXT("%.02fs"));
+            pDataField->SetStep(0.01);
+        }
+      }
+    }
+  } else {
+      /* no need to handle other case, because Unit can't be modified whenthis dialog is open
+       * default value are right for all other case.
+       */
   }
 }
 static const TCHAR* cYZone[] = {
@@ -190,7 +209,7 @@ int YZoneToenum(char c){
 
 static void SetValues(WndForm* wf) {
   WndProperty* wp;
-  if(Units::CoordinateFormat==4) {
+  if(Units::CoordinateFormat==cfUTM) {
 	  int utmXZone;
 	  char utmYZone;
 	  double easting, northing;
@@ -244,8 +263,8 @@ static void SetValues(WndForm* wf) {
 	  }
 
 	  switch (Units::CoordinateFormat) {
-	  case 0: // ("DDMMSS");
-	  case 1: // ("DDMMSS.ss");
+	  case cfDDMMSS: // ("DDMMSS");
+	  case cfDDMMSSss: // ("DDMMSS.ss");
 		wp = (WndProperty*)wf->FindByName(TEXT("prpLongitudeM"));
 		if (wp) {
 		  wp->GetDataField()->SetAsFloat(mm);
@@ -257,7 +276,7 @@ static void SetValues(WndForm* wf) {
 		  wp->RefreshDisplay();
 		}
 		break;
-	  case 2: // ("DDMM.mmm");
+	  case cfDDMMmmm: // ("DDMM.mmm");
 		wp = (WndProperty*)wf->FindByName(TEXT("prpLongitudeM"));
 		if (wp) {
 		  wp->GetDataField()->SetAsFloat(mm);
@@ -269,14 +288,14 @@ static void SetValues(WndForm* wf) {
 		  wp->RefreshDisplay();
 		}
 		break;
-	  case 3: // ("DD.dddd");
+	  case cfDDdddd: // ("DD.dddd");
 		wp = (WndProperty*)wf->FindByName(TEXT("prpLongitudeDDDD"));
 		if (wp) {
 		  wp->GetDataField()->SetAsFloat(10000.0*(mm+ss/60.0)/60.0);
 		  wp->RefreshDisplay();
 		}
 		break;
-	  case 4:
+	  case cfUTM:
 		  break;
 	  }
 
@@ -298,8 +317,8 @@ static void SetValues(WndForm* wf) {
 	  }
 
 	  switch (Units::CoordinateFormat) {
-	  case 0: // ("DDMMSS");
-	  case 1: // ("DDMMSS.ss");
+	  case cfDDMMSS: // ("DDMMSS");
+	  case cfDDMMSSss: // ("DDMMSS.ss");
 		wp = (WndProperty*)wf->FindByName(TEXT("prpLatitudeM"));
 		if (wp) {
 		  wp->GetDataField()->SetAsFloat(mm);
@@ -311,7 +330,7 @@ static void SetValues(WndForm* wf) {
 		  wp->RefreshDisplay();
 		}
 		break;
-	  case 2: // ("DDMM.mmm");
+	  case cfDDMMmmm: // ("DDMM.mmm");
 		wp = (WndProperty*)wf->FindByName(TEXT("prpLatitudeM"));
 		if (wp) {
 		  wp->GetDataField()->SetAsFloat(mm);
@@ -323,14 +342,14 @@ static void SetValues(WndForm* wf) {
 		  wp->RefreshDisplay();
 		}
 		break;
-	  case 3: // ("DD.dddd");
+	  case cfDDdddd: // ("DD.dddd");
 		wp = (WndProperty*)wf->FindByName(TEXT("prpLatitudeDDDD"));
 		if (wp) {
 		  wp->GetDataField()->SetAsFloat(10000.0*(mm+ss/60.0)/60.0);
 		  wp->RefreshDisplay();
 		}
 		break;
-	  case 4:
+	  case cfUTM:
 		break;
 	  }
   }
@@ -370,7 +389,7 @@ static void GetValues(WndForm* wf) {
   WndProperty* wp;
   double num=0, mm = 0, ss = 0; // mm,ss are numerators (division) so don't want to lose decimals
 
-  if(Units::CoordinateFormat==4) {
+  if(Units::CoordinateFormat==cfUTM) {
 	  int utmXZone=0;
 	  char utmYZone='\0';;
 	  double easting=0, northing=0;
@@ -410,19 +429,19 @@ static void GetValues(WndForm* wf) {
 	  }
 
 	  switch (Units::CoordinateFormat) {
-	  case 0: // ("DDMMSS");
-	  case 1: // ("DDMMSS.ss");
+	  case cfDDMMSS: // ("DDMMSS");
+	  case cfDDMMSSss: // ("DDMMSS.ss");
 		wp = (WndProperty*)wf->FindByName(TEXT("prpLongitudeM"));
 		if (wp) {
 		  mm = wp->GetDataField()->GetAsInteger();
 		}
 		wp = (WndProperty*)wf->FindByName(TEXT("prpLongitudeS"));
 		if (wp) {
-		  ss = wp->GetDataField()->GetAsInteger();
+		  ss = wp->GetDataField()->GetAsFloat();
 		}
 		num = dd+mm/60.0+ss/3600.0;
 		break;
-	  case 2: // ("DDMM.mmm");
+	  case cfDDMMmmm: // ("DDMM.mmm");
 		wp = (WndProperty*)wf->FindByName(TEXT("prpLongitudeM"));
 		if (wp) {
 		  mm = wp->GetDataField()->GetAsInteger();
@@ -433,14 +452,14 @@ static void GetValues(WndForm* wf) {
 		}
 		num = dd+(mm+ss/1000.0)/60.0;
 		break;
-	  case 3: // ("DD.dddd");
+	  case cfDDdddd: // ("DD.dddd");
 		wp = (WndProperty*)wf->FindByName(TEXT("prpLongitudeDDDD"));
 		if (wp) {
 		  mm = wp->GetDataField()->GetAsInteger();
 		}
 		num = dd+mm/10000;
 		break;
-	  case 4:
+	  case cfUTM:
 		break;
 	  }
 	  if (!sign) {
@@ -459,19 +478,19 @@ static void GetValues(WndForm* wf) {
 	  }
 
 	  switch (Units::CoordinateFormat) {
-	  case 0: // ("DDMMSS");
-	  case 1: // ("DDMMSS.ss");
+	  case cfDDMMSS: // ("DDMMSS");
+	  case cfDDMMSSss: // ("DDMMSS.ss");
 		wp = (WndProperty*)wf->FindByName(TEXT("prpLatitudeM"));
 		if (wp) {
 		  mm = wp->GetDataField()->GetAsInteger();
 		}
 		wp = (WndProperty*)wf->FindByName(TEXT("prpLatitudeS"));
 		if (wp) {
-		  ss = wp->GetDataField()->GetAsInteger();
+		  ss = wp->GetDataField()->GetAsFloat();
 		}
 		num = dd+mm/60.0+ss/3600.0;
 		break;
-	  case 2: // ("DDMM.mmm");
+	  case cfDDMMmmm: // ("DDMM.mmm");
 		wp = (WndProperty*)wf->FindByName(TEXT("prpLatitudeM"));
 		if (wp) {
 		  mm = wp->GetDataField()->GetAsInteger();
@@ -482,14 +501,14 @@ static void GetValues(WndForm* wf) {
 		}
 		num = dd+(mm+ss/1000.0)/60.0;
 		break;
-	  case 3: // ("DD.dddd");
+	  case cfDDdddd: // ("DD.dddd");
 		wp = (WndProperty*)wf->FindByName(TEXT("prpLatitudeDDDD"));
 		if (wp) {
 		  mm = wp->GetDataField()->GetAsInteger();
 		}
 		num = dd+mm/10000;
 		break;
-	  case 4:
+	  case cfUTM:
 		break;
 	  }
 	  if (!sign) {

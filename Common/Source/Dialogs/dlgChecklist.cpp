@@ -318,12 +318,12 @@ static bool LoadAsciiChecklist(const TCHAR* fileName) {
 #endif
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/// Reads checklist from file encoded in UTF-8.
+/// Reads checklist from file encoded in UTF-8 or Latin-1.
 ///
 /// @retval true  data loaded
 /// @retval false data load error
 ///
-static bool LoadUtfChecklist(const TCHAR* fileName, bool warn) {
+static bool LoadChecklist(const TCHAR* fileName, bool warn) {
 
   ZZIP_FILE *fp=openzip(fileName, "rb");
   if(!fp) {
@@ -344,7 +344,7 @@ static bool LoadUtfChecklist(const TCHAR* fileName, bool warn) {
   Name[0]= 0;
   TempString[0]=0;
 
-  charset cs = charset::utf8;
+  charset cs = charset::unknown;
   while(ReadString(fp,MAXNOTETITLE,TempString, cs)) {
     // skip comment lines
     if (TempString[0] == _T('#')) {
@@ -373,27 +373,27 @@ bool LoadChecklist(short checklistmode) {
 		LocalPath(filename, TEXT(LKD_CONF), _T(LKF_CHECKLIST));
 		_stprintf(NoteModeTitle,_T("%s"),MsgToken(878));  // notepad
 
-		if (LoadUtfChecklist(filename,false)) return true;
+		if (LoadChecklist(filename,false)) return true;
                 // if no user file, look for demo file
 		LocalPath(filename, TEXT(LKD_CONF), _T(LKF_CHECKLISTDEMO));
-		return LoadUtfChecklist(filename,true);
+		return LoadChecklist(filename,true);
 	// logbook TXT
 	case 1:
 		LocalPath(filename, TEXT(LKD_LOGS), _T(LKF_LOGBOOKTXT));
 		_stprintf(NoteModeTitle,_T("%s"),MsgToken(1748));  // logbook
-		 return LoadUtfChecklist(filename,true);
+		 return LoadChecklist(filename,true);
 	// logbook LST
 	case 2:
 		LocalPath(filename, TEXT(LKD_LOGS), _T(LKF_LOGBOOKLST));
 		_stprintf(NoteModeTitle,_T("%s"),MsgToken(1748));  // logbook
-		return LoadUtfChecklist(filename,true);
+		return LoadChecklist(filename,true);
 		break;
 	case 3:
 		SystemPath(filename, TEXT(LKD_SYSTEM));
 		_tcscat(filename,_T(DIRSEP));
 		_tcscat(filename,_T(LKF_CREDITS));
 		_stprintf(NoteModeTitle,_T("%s"),gettext(_T("Info")));
-		return LoadUtfChecklist(filename,true);
+		return LoadChecklist(filename,true);
 		break;
   default:
     StartupStore(_T("... Invalid checklist mode (%d)%s"),checklistmode,NEWLINE);
@@ -404,45 +404,54 @@ bool LoadChecklist(short checklistmode) {
 // checklistmode: 0=notepad 1=logbook 2=...
 void dlgChecklistShowModal(short checklistmode){
 
-  WndListFrame* wDetails = NULL;
-  WndOwnerDrawFrame* wDetailsEntry = NULL;
-
-  InitNotepad();
-  LoadChecklist(checklistmode); // check if loaded really something
-
-  WndForm* wf = dlgLoadFromXML(CallBackTable, ScreenLandscape ? IDR_XML_CHECKLIST_L : IDR_XML_CHECKLIST_P);
-
-  aTextLine.clear();
-
-  if (!wf) goto deinit;
-
+  std::unique_ptr<WndForm> wf(dlgLoadFromXML(CallBackTable, ScreenLandscape ? IDR_XML_CHECKLIST_L : IDR_XML_CHECKLIST_P));
+  if(!wf) {
+    StartupStore(_T("..... NOTEPAD ERROR Failed To Load Dialog!\n"));
+    return;
+  }
   wf->SetKeyDownNotify(FormKeyDown);
 
-  ((WndButton *)wf->FindByName(TEXT("cmdClose")))->SetOnClickNotify(OnCloseClicked);
+  WndButton* wndClose =  static_cast<WndButton*>(wf->FindByName(TEXT("cmdClose")));
+  if(!wndClose) {
+    StartupStore(_T("..... NOTEPAD ERROR NULL cmdClose!\n"));
+    return;
+  }
+  wndClose->SetOnClickNotify(OnCloseClicked);
 
-  wDetails = (WndListFrame*)wf->FindByName(TEXT("frmDetails"));
+
+  WndListFrame* wDetails = static_cast<WndListFrame*>(wf->FindByName(TEXT("frmDetails")));
   if (!wDetails) {
     StartupStore(_T("..... NOTEPAD ERROR NULL frmDetails!\n"));
-    goto deinit;
+    return;
   }
   wDetails->SetBorderKind(BORDERLEFT);
 
-  wDetailsEntry = (WndOwnerDrawFrame*)wf->FindByName(TEXT("frmDetailsEntry"));
+
+  WndOwnerDrawFrame* wDetailsEntry = static_cast<WndOwnerDrawFrame*>(wf->FindByName(TEXT("frmDetailsEntry")));
   if (!wDetailsEntry) {
     StartupStore(_T("..... NOTEPAD ERROR NULL frmDetailsEntry!\n"));
-    goto deinit;
+    return;
   }
   wDetailsEntry->SetCanFocus(true);
 
+  // calculate text line height
+  LKWindowSurface Surface(*wDetailsEntry);
+  const auto oldFont = Surface.SelectObject(wDetailsEntry->GetFont());
+  const int minHeight = Surface.GetTextHeight(_T("dp")) + 2 * DLGSCALE(2);
+  Surface.SelectObject(oldFont);
+  const int wHeight = wDetailsEntry->GetHeight();
+  if(minHeight != wHeight) {
+    wDetailsEntry->SetHeight(minHeight);
+  }
+
+  InitNotepad();
+  LoadChecklist(checklistmode); // check if loaded really something
+  aTextLine.clear();
+
   page = 0;
-  NextPage(wf, 0);
+  NextPage(wf.get(), 0);
 
   wf->ShowModal();
 
-
-deinit:
-
-  delete wf;
-  wf=NULL;
   DeinitNotepad();
 }

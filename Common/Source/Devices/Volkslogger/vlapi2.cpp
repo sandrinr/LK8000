@@ -122,7 +122,7 @@ void VLA_XFR::set_databaud(int32 db) {
 int16 VLA_XFR::sendcommand(byte cmd, byte param1, byte param2) {
   word       	i;
   byte	        c=255;
-  const int16   d = 2;  //Verzögerungszeit 2ms
+  const int16   d = 2;  //VerzÃ¶gerungszeit 2ms
   byte 		cmdarray[8];
   word          crc16 = 0;
   int32	 	t1;
@@ -131,7 +131,7 @@ int16 VLA_XFR::sendcommand(byte cmd, byte param1, byte param2) {
   wait_ms(100);
   serial_empty_io_buffers();
 
-  // Kommandointerpreter im VL zurücksetzen
+  // Kommandointerpreter im VL zurÃ¼cksetzen
   for(i=0; i<6; i++) {
     serial_out(CAN);
     wait_ms(d);
@@ -158,7 +158,7 @@ int16 VLA_XFR::sendcommand(byte cmd, byte param1, byte param2) {
   wait_ms(d);
   serial_out(crc16%256);
   wait_ms(d);
-  // Kommandobestätigung abwarten, aber höchstens timeout Sekunden
+  // KommandobestÃ¤tigung abwarten, aber hÃ¶chstens timeout Sekunden
   t1 = get_timer_s()+timeout;
   while( serial_in(&c) && (get_timer_s()<t1) )
     progress_set(VLS_TXT_SENDCMD);
@@ -180,10 +180,10 @@ int16 VLA_XFR::sendcommand(byte cmd, byte param1, byte param2) {
     showwait(VLS_TXT_NOFR);
     break;
   }
-  // Fehlercode als Rückgabewert der Funktion benutzen
+  // Fehlercode als RÃ¼ckgabewert der Funktion benutzen
   return c;
-  // Rückgabewert:     -1 : timeout
-  //		 0..255 : Bestätigungscode vom Logger
+  // RÃ¼ckgabewert:     -1 : timeout
+  //		 0..255 : BestÃ¤tigungscode vom Logger
 }
 
 
@@ -237,7 +237,7 @@ int32 VLA_XFR::readlog(lpb puffer, int32 maxlen) {
       ende = 1;
     }
 
-    // dabei ist Benutzerabbruch jederzeit möglich
+    // dabei ist Benutzerabbruch jederzeit mÃ¶glich
     if (test_user_break()) {
       if (clear_user_break() == 1) {
         ende = -1;
@@ -357,8 +357,8 @@ VLA_ERROR VLA_XFR::dbbput(lpb dbbbuffer, int32 dbbsize) {
 
   // Schreibkommando geben
   serial_empty_io_buffers();
-  sendcommand(cmd_PDB,0,0); // muß noch mit Timeout versehen werden
-  // auf Löschende warten
+  sendcommand(cmd_PDB,0,0); // muÃŸ noch mit Timeout versehen werden
+  // auf LÃ¶schende warten
   while ( serial_in(&c) && !test_user_break() );
   // Fehlerbehandlung
   if (test_user_break())
@@ -385,7 +385,7 @@ VLA_ERROR VLA_XFR::dbbput(lpb dbbbuffer, int32 dbbsize) {
   wait_ms(td);
   serial_out(crc16%256);
   wait_ms(td);
-  // auf Bestätigung warten
+  // auf BestÃ¤tigung warten
   while ( serial_in(&c) && !test_user_break());
   // Fehlerbehandlung
   if (test_user_break()) {
@@ -412,7 +412,7 @@ VLA_ERROR VLA_XFR::dbbget(lpb dbbbuffer, int32 dbbsize) {
   wait_ms(300);
   if (groesse <= 0)
     return VLA_ERR_NODATA;
-  // und Tschüß
+  // und TschÃ¼ÃŸ
   return VLA_ERR_NOERR;
 }
 
@@ -441,7 +441,7 @@ VLA_ERROR VLA_XFR::all_logsget(lpb dbbbuffer, int32 dbbsize) {
   wait_ms(300);
   if (groesse <= 0)
     return VLA_ERR_NODATA;
-  // und Tschüß
+  // und TschÃ¼ÃŸ
   return VLA_ERR_NOERR;
 }
 
@@ -513,7 +513,7 @@ VLA_ERROR VLA_XFR::connect(int32 waittime, int quietmode ) {
 
   stoptime = get_timer_s() + waittime;
 
-  do { // Solange R's aussenden, bis ein L zurückkommt
+  do { // Solange R's aussenden, bis ein L zurÃ¼ckkommt
     serial_out('R');
     wait_ms(30);
     if (get_timer_s() >= stoptime)
@@ -842,7 +842,7 @@ void VLAPI_DATA::WPT::get(lpb p) {
   int32 ll;
   memcpy(name,p,6);
   name[6] = 0;
-  strupr(name);
+  volkslogger::strupr(name);
   typ = (WPTTYP) p[6] & 0x7f;
   ll =  (int32) (65536.0*(p[7]&0x7f) + 256.0 * p[8] + p[9]);
   lat = ll / 60000.0;
@@ -861,13 +861,13 @@ void VLAPI_DATA::WPT::get(lpb p) {
 void VLAPI_DATA::WPT::put(lpb p) {
   int32 llat,llon;
   int16 i,l;
-  // String, evtl. mit Blanks aufgefüllt, zurückschreiben
-  strupr(name);
+  // String, evtl. mit Blanks aufgefÃ¼llt, zurÃ¼ckschreiben
+  volkslogger::strupr(name);
   memcpy(p,name,6);
   l = strlen((char *)p);
   for(i=l; i<6; i++)
     p[i] = ' ';
-  // Koordinaten zurückschreiben
+  // Koordinaten zurÃ¼ckschreiben
   llat = labs((long)(lat * 60000.0));
   llon = labs((long)(lon * 60000.0));
   p[6] = (typ&0x7f) | ((lon<0)?0x80:0);
@@ -931,14 +931,14 @@ void VLAPI_DATA::DCLWPT::put(lpb p) {
 void VLAPI_DATA::ROUTE::get(lpb p) {
   memcpy(name,p,14);
   name[14] = 0;
-  strupr(name);
+  volkslogger::strupr(name);
   for(int i=0; i<10; i++)
     wpt[i].get(p + 14 + i*13);
 }
 
 void VLAPI_DATA::ROUTE::put(lpb p) {
 	int i;
-  strupr(name);
+  volkslogger::strupr(name);
   memcpy(p,name,14);
   for(i=strlen((char *)p); i<14; i++)
     p[i] = ' ';
@@ -951,12 +951,12 @@ void VLAPI_DATA::ROUTE::put(lpb p) {
 void VLAPI_DATA::PILOT::get(lpb p) {
   memcpy(name,p,16);
   name[16] = 0;
-  strupr(name);
+  volkslogger::strupr(name);
 }
 
 void VLAPI_DATA::PILOT::put(lpb p) {
 
-  strupr(name);
+  volkslogger::strupr(name);
   memcpy(p,name,16);
   for(int i=strlen((char *)p); i<16; i++)
     p[i] = ' ';
@@ -1014,11 +1014,11 @@ void VLAPI_DATA::DECLARATION::get(DBB *dbb) {
 
 
 void VLAPI_DATA::DECLARATION::put(DBB *dbb) {
-  strupr(flightinfo.pilot);
-  strupr(flightinfo.glidertype);
-  strupr(flightinfo.gliderid);
-  strupr(flightinfo.competitionclass);
-  strupr(flightinfo.competitionid);
+  volkslogger::strupr(flightinfo.pilot);
+  volkslogger::strupr(flightinfo.glidertype);
+  volkslogger::strupr(flightinfo.gliderid);
+  volkslogger::strupr(flightinfo.competitionclass);
+  volkslogger::strupr(flightinfo.competitionid);
 
   char name[65];
   char name2[17];

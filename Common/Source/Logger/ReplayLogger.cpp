@@ -313,9 +313,10 @@ bool ReplayLogger::UpdateInternal(void) {
   static CatmullRomInterpolator cli;
 
   time_t rawtime;
+  struct tm tm_temp= {0};
   struct tm * timeinfo;
   time (&rawtime);
-  timeinfo = localtime (&rawtime);
+  timeinfo = gmtime_r(&rawtime, &tm_temp);
 
   static double time_lstart = 0;
 
@@ -391,7 +392,7 @@ bool ReplayLogger::UpdateInternal(void) {
       GPS_INFO.Speed = SpeedX;
       GPS_INFO.TrackBearing = BearingX;
       GPS_INFO.Altitude = AltX;
-      GPS_INFO.BaroAltitude = AltitudeToQNHAltitude(AltX);
+      GPS_INFO.BaroAltitude = QNEAltitudeToQNHAltitude(AltX);
       GPS_INFO.Time = ReplayTime;
       UnlockFlightData();
     } else {

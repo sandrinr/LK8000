@@ -6,7 +6,7 @@
 **
 ************************************************************************
 **
-**   Copyright (c):  2002 by André Somers
+**   Copyright (c):  2002 by AndrÃ© Somers
 **
 **   This file is distributed under the terms of the General Public
 **   Licence. See the file COPYING for more information.
@@ -37,10 +37,6 @@ WindMeasurementList::~WindMeasurementList(){
   * if no valid vector could be calculated (for instance: too little or
   * too low quality data).
   */
-
-extern int iround(double);
-
-
 Vector WindMeasurementList::getWind(double Time, double alt, bool *found){
   //relative weight for each factor
   #define REL_FACTOR_QUALITY 100

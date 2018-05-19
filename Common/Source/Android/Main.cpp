@@ -25,6 +25,7 @@
 #include "Android/PortBridge.hpp"
 #include "Android/BluetoothHelper.hpp"
 #include "Android/NativeLeScanCallback.hpp"
+#include <Android/IOIOHelper.hpp>
 
 #include "Screen/OpenGL/Init.hpp"
 #include "Screen/Debug.hpp"
@@ -34,11 +35,17 @@
 #include "Window/WndMain.h"
 #include "Screen/OpenGL/Texture.hpp"
 #include "Screen/OpenGL/Buffer.hpp"
+#include "UsbSerialHelper.h"
+#include "Android/crashlytics.h"
 
 unsigned android_api_level;
 
+crashlytics_context_t* crash_context = nullptr;
+
 Context *context;
 NativeView *native_view;
+
+IOIOHelper *ioio_helper = nullptr;
 
 extern WndMain MainWindow;
 
@@ -75,6 +82,10 @@ Java_org_LK8000_NativeView_initializeNative(JNIEnv *env, jobject obj,
 {
   android_api_level = sdk_version;
 
+
+  crash_context = crashlytics_init();
+
+
   Java::Init(env);
   Java::Object::Initialise(env);
   Java::File::Initialise(env);
@@ -88,6 +99,9 @@ Java_org_LK8000_NativeView_initializeNative(JNIEnv *env, jobject obj,
   PortBridge::Initialise(env);
   BluetoothHelper::Initialise(env);
   NativeLeScanCallback::Initialise(env);
+  UsbSerialHelper::Initialise(env);
+
+  const bool have_ioio = IOIOHelper::Initialise(env);
 
   context = new Context(env, _context);
 
@@ -100,7 +114,16 @@ Java_org_LK8000_NativeView_initializeNative(JNIEnv *env, jobject obj,
 
   event_queue = new EventQueue();
 
+  if (have_ioio) {
+    try {
+      ioio_helper = new IOIOHelper(env);
+    } catch (Java::Exception e) {
+      StartupStore("IOIO unavailable : \"%s\"\n", e.what());
+    }
+  }
+
   SoundUtil::Initialise(env);
+
 
   ScreenInitialized();
 
@@ -115,7 +138,6 @@ Java_org_LK8000_NativeView_runNative(JNIEnv *env, jobject obj) {
 
   OpenGL::Initialise();
   MainWindow.RunModalLoop();
-  MainWindow.Destroy();
 }
 
 extern "C"
@@ -132,6 +154,9 @@ Java_org_LK8000_NativeView_deinitializeNative(JNIEnv *env, jobject obj)
   delete native_view;
   native_view = nullptr;
 
+  delete ioio_helper;
+  ioio_helper = nullptr;
+
   TextUtil::Deinitialise(env);
   OpenGL::Deinitialise();
   ScreenDeinitialized();
@@ -139,6 +164,8 @@ Java_org_LK8000_NativeView_deinitializeNative(JNIEnv *env, jobject obj)
   delete context;
   context = nullptr;
 
+  UsbSerialHelper::Deinitialise(env);
+  IOIOHelper::Deinitialise(env);
   NativeLeScanCallback::Deinitialise(env);
   BluetoothHelper::Deinitialise(env);
   NativeInputListener::Deinitialise(env);
@@ -148,6 +175,8 @@ Java_org_LK8000_NativeView_deinitializeNative(JNIEnv *env, jobject obj)
   AndroidBitmap::Deinitialise(env);
   Environment::Deinitialise(env);
   NativeView::Deinitialise(env);
+
+   crashlytics_free(&crash_context);
 }
 
 extern "C"

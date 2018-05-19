@@ -130,7 +130,7 @@ namespace lk {
             directory_iterator_impl_POSIX(const TCHAR* szPath) {
 
                 std::string strPath(szPath);
-                unsigned found = strPath.find_last_of("/\\");
+                const std::string::size_type found = strPath.find_last_of("/\\");
                 _sPattern = strPath.substr(found + 1);
                 strPath.erase(found + 1);
 
@@ -162,7 +162,7 @@ namespace lk {
             }
 
             virtual bool isDirectory() const {
-#ifdef  _DIRENT_HAVE_D_TYPE
+#if defined(_DIRENT_HAVE_D_TYPE) && defined(DTTOIF)
                 return S_ISDIR(DTTOIF(entry.d_type));
 #else
                 struct stat st;

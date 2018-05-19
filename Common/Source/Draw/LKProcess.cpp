@@ -1566,9 +1566,9 @@ goto_bearing:
 			// Cant use NavAltitude, because FL should use Baro if available, despite
 			// user settings.
 			if (DrawInfo.BaroAltitudeAvailable)
-				value=(TOFEET*(AltitudeToQNEAltitude(DrawInfo.BaroAltitude)))/100.0;
+				value=(TOFEET*(QNHAltitudeToQNEAltitude(DrawInfo.BaroAltitude)))/100.0;
 			else
-				value=(TOFEET*(AltitudeToQNEAltitude(DrawInfo.Altitude)))/100.0;
+				value=(TOFEET*(QNHAltitudeToQNEAltitude(DrawInfo.Altitude)))/100.0;
 
 			#if 0
 	if (DrawInfo.BaroAltitudeAvailable) {
@@ -2314,16 +2314,13 @@ olc_score:
 
 			if(ValidWayPoint(index))
 			{
-				_stprintf(BufferTitle,_T("<"));
-				if ( DisplayTextType == DISPLAYFIRSTTHREE)
-				{
-					 LK_tcsncpy(BufferTitle+1,WayPointList[index].Name,3);
+				if (DisplayTextType == DISPLAYFIRSTTHREE) {
+					_stprintf(BufferTitle, _T("<%.3s"), WayPointList[index].Name);
 				}
 				else if( DisplayTextType == DISPLAYNUMBER) {
-					_stprintf(BufferTitle+1,TEXT("%d"), WayPointList[index].Number );
+					_stprintf(BufferTitle,TEXT("<%d"), WayPointList[index].Number );
 				} else {
-					LK_tcsncpy(BufferTitle+1,WayPointList[index].Name, 12);
-					// BufferTitle[(sizeof(Text)/sizeof(TCHAR))-1] = '\0';
+					_stprintf(BufferTitle, _T("<%.12s"), WayPointList[index].Name);
 					if (lktitle)
 						BufferTitle[12] = '\0'; // FIX TUNING
 					else
@@ -2471,7 +2468,7 @@ olc_score:
 			_tcscpy(BufferTitle, MsgToken(2324));
 			value = -1;
 			if (DrawInfo.BaroAltitudeAvailable) {
-				value= AltitudeToQNEAltitude(DrawInfo.BaroAltitude);
+				value= QNHAltitudeToQNEAltitude(DrawInfo.BaroAltitude);
 				_stprintf(BufferValue, TEXT("%d"),(int)value);
 			}
 			else {
@@ -2480,6 +2477,58 @@ olc_score:
 			}
 			valid=true;
 			break;
+      
+    case LK_NEXT_DIST_RADIUS:
+      value = NAN;
+      if ( ValidTaskPoint(ActiveTaskPoint)) {
+        const double Distance = WayPointCalc[Task[ActiveTaskPoint].Index].Distance;
+        if (ActiveTaskPoint == 0) {
+          if (StartLine == 0) {
+            value = Distance - StartRadius;
+          }
+        } else if (ValidTaskPoint(ActiveTaskPoint + 1)) {
+          if (!AATEnabled && !DoOptimizeRoute()) {
+            if(SectorType == CIRCLE) {
+              value = Distance - SectorRadius;
+            }
+          } else {
+            switch(Task[ActiveTaskPoint].AATType) {
+              case CIRCLE : // CIRCLE
+              case 2 : // CONE
+              case 3 : // ESS_CIRCLE
+                value = Distance - Task[ActiveTaskPoint].AATCircleRadius;
+                break;
+            }
+          }
+        } else {
+          if(FinishLine == 0) {
+            value = DerivedDrawInfo.WaypointDistance - FinishRadius;
+          }
+        }
+      }
+      
+      if(value != NAN) {
+        value=Units::ToUserDistance(value);
+        valid=true;
+        if (value>99 || value==0)
+          _stprintf(BufferValue, TEXT("%.0f"),value);
+        else {
+          if (ISPARAGLIDER) {
+            if (value>10)
+              _stprintf(BufferValue, TEXT("%.1f"),value);
+            else 
+              _stprintf(BufferValue, TEXT("%.2f"),value);
+          } else {
+            _stprintf(BufferValue, TEXT("%.1f"),value);
+          }
+        }          
+      } else {
+        _tcscpy(BufferValue, TEXT(NULLMEDIUM)); // 091221
+      }
+      
+      _tcscpy(BufferUnit, Units::GetDistanceName());
+      _tcscpy(BufferTitle, Data_Options[lkindex].Title );
+      break;
 
 		// B141
 		case LK_WIND:

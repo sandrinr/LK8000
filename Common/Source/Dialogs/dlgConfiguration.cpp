@@ -38,6 +38,10 @@
 #include "Android/Main.hpp"
 #include "Android/NativeView.hpp"
 #include "Android/Context.hpp"
+#include "Android/BluetoothHelper.hpp"
+#include "Android/BluetoothLeScan.h"
+#include "Util/ScopeExit.hxx"
+#include <sstream>
 #endif
 using namespace std::placeholders;
 
@@ -492,12 +496,13 @@ static void OnAspPermModified(DataField *Sender, DataField::DataAccessKind_t Mod
     case DataField::daPut:
     case DataField::daChange:
       wp = (WndProperty*)wf->FindByName(TEXT("prpAspPermDisable"));
-      if (wp)
+      if (wp) {
     	  AspPermanentChanged=(wp->GetDataField()->GetAsInteger());
-          #ifdef TESTBENCH 
-          StartupStore(_T(".......AspPermanentChanged %i %s"),AspPermanentChanged,NEWLINE);
-          #endif
-          break;
+      }
+#ifdef TESTBENCH 
+      StartupStore(_T(".......AspPermanentChanged %i %s"),AspPermanentChanged,NEWLINE);
+#endif
+      break;
     default:
                 #ifdef TESTBENCH
 		StartupStore(_T("........... DBG-908%s"),NEWLINE);
@@ -1492,8 +1497,10 @@ static void GetInfoBoxSelector(int item, int mode)
 static  TCHAR temptext[MAX_PATH];
 
 void UpdateComPortList(WndProperty* wp, LPCTSTR szPort) {
-    RefreshComPortList();
-    
+#ifdef ANDROID
+    ScopeLock lock(COMMPort_mutex);
+#endif
+
     if (wp) {
         DataField* dfe =  wp->GetDataField();
         if(dfe) {
@@ -1682,21 +1689,22 @@ static void setVariables( WndForm *pOwner) {
   }
 
   TCHAR deviceName1[MAX_PATH];
-  //  TCHAR deviceName2[MAX_PATH];
-  wp = (WndProperty*)wf->FindByName(TEXT("prpComDevice1"));
-
-
-
-
   ReadDeviceSettings(SelectedDevice, deviceName1);
+  wp = (WndProperty*)wf->FindByName(TEXT("prpComDevice1"));
   if (wp) {
     DataField* dfe = wp->GetDataField();
     for (int i=0; i<DeviceRegisterCount; i++) {
       LPCTSTR DeviceName = devRegisterGetName(i);
       dfe->addEnumText(DeviceName);
 
-      if (_tcscmp(DeviceName, deviceName1) == 0)
-        dwDeviceIndex[SelectedDevice] = i;
+      static_assert(array_size(dwDeviceIndex) ==  array_size(dwDeviceName), "Invalid array size");
+      for (unsigned j=0; j< array_size(dwDeviceName); j++) {
+        LPCTSTR DeviceName = devRegisterGetName(i);
+        if (_tcscmp(DeviceName, dwDeviceName[j]) == 0) {
+          dwDeviceIndex[j] = i;
+          break;
+        }
+      }  
     }
     dfe->Sort(3);
     dfe->Set(dwDeviceIndex[SelectedDevice]);
@@ -2079,12 +2087,10 @@ DataField* dfe = wp->GetDataField();
     dfe->addEnumText(MsgToken(393));
 	// LKTOKEN  _@M609_ = "Shade" 
     dfe->addEnumText(MsgToken(609));
-    #ifdef GTL2
         // "Line+NextWP"
     dfe->addEnumText(MsgToken(1805));
         // "Shade+NextWP"
     dfe->addEnumText(MsgToken(1806));
-    #endif
     dfe->Set(FinalGlideTerrain);
     wp->RefreshDisplay();
   }
@@ -2274,6 +2280,7 @@ DataField* dfe = wp->GetDataField();
     DataField* dfe = wp->GetDataField();
     dfe->addEnumText(TEXT("knots"));
     dfe->addEnumText(TEXT("m/s"));
+    dfe->addEnumText(TEXT("ft/min"));
     dfe->Set(LiftUnit_Config);
     wp->RefreshDisplay();
   }
@@ -3079,14 +3086,15 @@ DataField* dfe = wp->GetDataField();
 
   wp = (WndProperty*)wf->FindByName(TEXT("prpTerrainContrast"));
   if (wp) {
-    wp->GetDataField()->SetAsFloat(iround(TerrainContrast*100/255));
+
+    wp->GetDataField()->SetAsFloat(iround((TerrainContrast*100.0)/255.0));
     if (AutoContrast) wp->SetReadOnly(true); // needed on dlg startup
     wp->RefreshDisplay();
   }
 
   wp = (WndProperty*)wf->FindByName(TEXT("prpTerrainBrightness"));
   if (wp) {
-    wp->GetDataField()->SetAsFloat(iround(TerrainBrightness*100/255));
+    wp->GetDataField()->SetAsFloat(iround((TerrainBrightness*100.0)/255.0));
     if (AutoContrast) wp->SetReadOnly(true); // needed on dlg startup
     wp->RefreshDisplay();
   }
@@ -3316,8 +3324,63 @@ wp->RefreshDisplay();
   }
 }
 
+#ifdef ANDROID
 
+#define UPDATE_COM_PORT 1
 
+static void OnLeScan(WndForm* pWndForm, const char *address, const char *name) {
+#ifdef ANDROID
+  ScopeLock lock(COMMPort_mutex);
+#endif
+
+  std::stringstream prefixed_address_stream;
+  prefixed_address_stream << "BT:" << address;
+  const std::string prefixed_address(prefixed_address_stream.str());
+
+  COMMPort_t::const_iterator It = std::find_if(COMMPort.begin(),
+                                               COMMPort.end(),
+                                               std::bind(&COMMPortItem_t::IsSamePort, _1,
+                                                         prefixed_address.c_str()));
+
+  if (It == COMMPort.end()) {
+    std::stringstream prefixed_name_stream;
+    prefixed_name_stream << "BT:" << ((strlen(name)>0)? name : address);
+    const std::string prefixed_name(prefixed_name_stream.str());
+
+    COMMPort.push_back(COMMPortItem_t(std::move(prefixed_address), std::move(prefixed_name)));
+  }
+  if(pWndForm) {
+    pWndForm->SendUser(UPDATE_COM_PORT);
+  }
+}
+
+static bool OnUser(WndForm * pWndForm, unsigned id) {
+  switch(id) {
+    case UPDATE_COM_PORT: {
+      WndProperty *pWnd = static_cast<WndProperty *>(pWndForm->FindByName(TEXT("prpComPort1")));
+      if (pWnd) {
+        DataField * dataField = pWnd->GetDataField();
+        if(dataField) {
+
+#ifdef ANDROID
+          ScopeLock lock(COMMPort_mutex);
+#endif
+          for( const auto& item : COMMPort ) {
+            if(dataField->Find(item.GetName()) == -1) {
+              dataField->addEnumText(item.GetName(), item.GetLabel());
+            }
+          }
+        }
+      }
+      return true;
+    }
+    default:
+      break;
+  }
+  return false;
+}
+
+#endif
 
 void dlgConfigurationShowModal(short mode){
 
@@ -3345,7 +3408,11 @@ void dlgConfigurationShowModal(short mode){
   
   static_assert(array_size(dlgTemplate_L) == array_size(dlgTemplate_P), "check array size");
   
-  StartHourglassCursor(); 
+  StartHourglassCursor();
+
+  if (configMode==CONFIGMODE_DEVICE) {
+    RefreshComPortList();
+  }
 
   if(configMode >= 0 && configMode < (int)array_size(dlgTemplate_L)) {
     
@@ -3360,7 +3427,17 @@ void dlgConfigurationShowModal(short mode){
   if (!wf) {
 	return;
   }
-  
+
+#ifdef ANDROID
+  wf->SetOnUser(OnUser);
+
+  std::unique_ptr<BluetoothLeScan> BluetoothLeScanPtr;
+  if(configMode==CONFIGMODE_DEVICE) {
+    // Start Bluetooth LE device scan before Open Dialog
+    BluetoothLeScanPtr.reset(new BluetoothLeScan(wf, OnLeScan));
+  }
+#endif
+
   wf->SetKeyDownNotify(FormKeyDown);
 
   LKASSERT((WndButton *)wf->FindByName(TEXT("cmdClose")));
@@ -3426,6 +3503,11 @@ void dlgConfigurationShowModal(short mode){
 
   StopHourglassCursor();
   wf->ShowModal();
+
+#ifdef ANDROID
+    // stop LE Scaner first aftar dialog close
+    BluetoothLeScanPtr.reset();
+#endif
 
 #ifdef _WGS84
   wp = static_cast<WndProperty*>(wf->FindByName(_T("prpEarthModel")));
@@ -3875,17 +3957,13 @@ int ival;
     if ((int)SpeedUnit_Config != wp->GetDataField()->GetAsInteger()) {
       SpeedUnit_Config = wp->GetDataField()->GetAsInteger();
       Units::NotifyUnitChanged();
-      requirerestart = true;
     }
   }
 
   wp = (WndProperty*)wf->FindByName(TEXT("prpUnitsLatLon"));
   if (wp) {
     if ((int)Units::CoordinateFormat != wp->GetDataField()->GetAsInteger()) {
-      Units::CoordinateFormat = (CoordinateFormats_t)
-        wp->GetDataField()->GetAsInteger();
-      Units::NotifyUnitChanged();
-      requirerestart = true;
+      Units::CoordinateFormat = (CoordinateFormats_t)wp->GetDataField()->GetAsInteger();
     }
   }
 
@@ -3894,7 +3972,6 @@ int ival;
     if ((int)TaskSpeedUnit_Config != wp->GetDataField()->GetAsInteger()) {
       TaskSpeedUnit_Config = wp->GetDataField()->GetAsInteger();
       Units::NotifyUnitChanged();
-      requirerestart = true;
     }
   }
 
@@ -3903,7 +3980,6 @@ int ival;
     if ((int)DistanceUnit_Config != wp->GetDataField()->GetAsInteger()) {
       DistanceUnit_Config = wp->GetDataField()->GetAsInteger();
       Units::NotifyUnitChanged();
-      requirerestart = true;
     }
   }
 
@@ -3912,7 +3988,6 @@ int ival;
     if ((int)LiftUnit_Config != wp->GetDataField()->GetAsInteger()) {
       LiftUnit_Config = wp->GetDataField()->GetAsInteger();
       Units::NotifyUnitChanged();
-      requirerestart = true;
     }
   }
 
@@ -3921,7 +3996,6 @@ int ival;
     if ((int)AltitudeUnit_Config != wp->GetDataField()->GetAsInteger()) {
       AltitudeUnit_Config = wp->GetDataField()->GetAsInteger();
       Units::NotifyUnitChanged();
-      requirerestart = true;
     }
   }
 
@@ -4448,7 +4522,7 @@ int ival;
 
   wp = (WndProperty*)wf->FindByName(TEXT("prpTerrainContrast"));
   if (wp) {
-    if (iround(TerrainContrast*100/255) != 
+    if (iround((TerrainContrast*100)/255) != 
 	wp->GetDataField()->GetAsInteger()) {
       TerrainContrast = (short)iround(wp->GetDataField()->GetAsInteger()*255.0/100);
     }
@@ -4456,7 +4530,7 @@ int ival;
 
   wp = (WndProperty*)wf->FindByName(TEXT("prpTerrainBrightness"));
   if (wp) {
-    if (iround(TerrainBrightness*100/255) != 
+    if (iround((TerrainBrightness*100)/255) != 
 	wp->GetDataField()->GetAsInteger()) {
       TerrainBrightness = (short)iround(wp->GetDataField()->GetAsInteger()*255.0/100);
     }
@@ -4593,10 +4667,9 @@ int ival;
 		   TEXT("Configuration"), mbOk);
     }
 
-  delete wf;
 
+  delete wf;
   wf = NULL;
-  
 
 }
 
@@ -4692,7 +4765,7 @@ void InitDlgDevice(WndForm *pWndForm) {
       pWnd->SetLeft(lx);
       ((WndButton*)pWnd)->LedSetMode(LEDMODE_OFFGREEN);
       ((WndButton*)pWnd)->LedSetOnOff(!DeviceList[i].Disabled);
-
+      if(i==0) OnA((WndButton*)pWnd);
       lx += w + SPACEBORDER;
     }
   }

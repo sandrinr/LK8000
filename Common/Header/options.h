@@ -86,14 +86,14 @@
  //#define YDEBUG       1       // Force using assert() instead of LKASSERT even if DEBUG is off.
                                 // See above. Should not be necessary, but it is a reminder.
 
- #define BUGSTOP	1	// STOP by LKASSERT even if the condition was managed, to show
+// #define BUGSTOP	1   	// STOP by LKASSERT even if the condition was managed, to show
 				// the problem during alpha stages.
 				// Normally these conditions should not exist
 
- #define TESTBENCH	1	// THIS IS USING MORE MESSAGES, DOING MORE CHECKS, AND IT IS GOOD
+// #define TESTBENCH	1	// THIS IS USING MORE MESSAGES, DOING MORE CHECKS, AND IT IS GOOD
 				// FOR DEVELOPMENT VERSIONS. CAN BE USED FOR SPECIAL BETAs,
 				// but normally should not be used for public releases.
- #define USELKASSERT	1	// Enable LKASSERT checks and diagnostic messages at runtime.
+// #define USELKASSERT	1	// Enable LKASSERT checks and diagnostic messages at runtime.
 				// For TESTBENCH and beta versions this should be always ENABLED.
 				// Only in official stable versions it should be disabled.
 
@@ -114,12 +114,6 @@
 
 
 // #define LKCOMPETITION	1	// Will disable TRI
-
-// Draws a glide terrain line around the next (active) task waypoint.
-// Includes addition of MSG tokens "Line+NextWP" & "Shade+NextWP"
-// and change in HELP message 194 (for "Glide Terrain Line" setting).
-// Eric Carden, September 13, 2012
-#define GTL2
 
 // Activate FastZoom and QUICKDRAW conditions, for fast paint of map the first time after zoom request
 // In v5 this is practically unused. Should be removed asap.

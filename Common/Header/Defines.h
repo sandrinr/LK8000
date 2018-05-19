@@ -97,7 +97,7 @@
 
 #define LKFORK		"LK8000"
 #define LKVERSION	"6"
-#define LKRELEASE	"1g0"
+#define LKRELEASE	"1s0"
 
 #define LKDATADIR	"LK8000"
 #define LKPROFILE	"DEFAULT_PROFILE.prf"
@@ -703,6 +703,7 @@
 #define LK_SPEED_ME      133		// Maximum efficiency speed to fly
 #define LK_TARGET_RE     134		// Target Req. Efficicency
 #define LK_QNE           135		// Barometric QNE Altitude
+#define LK_NEXT_DIST_RADIUS   136	  // Distance to Next turnpoint minus turnpoint cylindre radius (center for line and sector turnpoint)
 
 // The following values are not available for custom configuration
 
@@ -940,10 +941,9 @@ static const double PI = (4*atan(1));
 #define CURMODE ModeTable[ModeIndex][CURTYPE]
 #define INVERTCOLORS  (Appearance.InverseInfoBox)
 #define TASKINDEX       Task[ActiveTaskPoint].Index
-#ifdef GTL2
+
 #define ACTIVE_WP_IS_AAT_AREA (AATEnabled && (ActiveTaskPoint > 0) \
                               && ValidTaskPoint(ActiveTaskPoint + 1))
-#endif
 
 #define DONTDRAWTHEMAP  (!MapWindow::mode.AnyPan()&&MapSpaceMode!=MSM_MAP)
 #define MAPMODE8000     (!MapWindow::mode.AnyPan()&&MapSpaceMode==MSM_MAP)

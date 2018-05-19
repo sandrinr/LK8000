@@ -902,7 +902,7 @@ BOOL NMEAParser::PLKAS(TCHAR *String, TCHAR **params, size_t nparams, NMEA_INFO 
   
   double vias=StrToDouble(params[0],NULL)/10.0;
   if (vias >1) {
-    pGPS->TrueAirspeed = vias*AirDensityRatio(pGPS->Altitude);
+    pGPS->TrueAirspeed = vias*AirDensityRatio(QNHAltitudeToQNEAltitude(pGPS->Altitude));
     pGPS->IndicatedAirspeed = vias;
   } else {
     pGPS->TrueAirspeed = 0;
@@ -935,7 +935,7 @@ BOOL NMEAParser::RMZ(TCHAR *String, TCHAR **params, size_t nparams, NMEA_INFO *p
   RMZDelayed=0;
 
   RMZAltitude = ParseAltitude(params[0], params[1]);
-  RMZAltitude = AltitudeToQNHAltitude(RMZAltitude);
+  RMZAltitude = QNEAltitudeToQNHAltitude(RMZAltitude);
   RMZAvailable = true;
   LastRMZHB=LKHearthBeats; // this is common to both ports!
 
@@ -967,7 +967,7 @@ BOOL NMEAParser::PTAS1(TCHAR *String, TCHAR **params, size_t nparams, NMEA_INFO 
   pGPS->TrueAirspeed = vtas;
   pGPS->VarioAvailable = TRUE;
   pGPS->Vario = wnet;
-  UpdateBaroSource(pGPS, BARO__TASMAN, NULL,  AltitudeToQNHAltitude(baralt));
+  UpdateBaroSource(pGPS, BARO__TASMAN, NULL,  QNEAltitudeToQNHAltitude(baralt));
   pGPS->IndicatedAirspeed = vtas/AirDensityRatio(baralt);
  
   TASAvailable = true; // 100411 

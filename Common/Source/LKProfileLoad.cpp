@@ -216,6 +216,9 @@ void LKParseProfileString(const char *sname, const char *svalue) {
   PREAD(sname,svalue,szRegistryAircraftCategory, &AircraftCategory);
   PREAD(sname,svalue,szRegistryAircraftRego, &*AircraftRego_Config, array_size(AircraftRego_Config));
   PREAD(sname,svalue,szRegistryAircraftType, &*AircraftType_Config, array_size(AircraftType_Config));
+  if (matchedstring) {
+      return;
+  }
 
   PREAD(sname,svalue,szRegistryAirfieldFile, &*szAirfieldFile, array_size(szAirfieldFile));
   if (matchedstring) {
@@ -492,7 +495,10 @@ void LKParseProfileString(const char *sname, const char *svalue) {
   PREAD(sname,svalue,szRegistryLockSettingsInFlight,&LockSettingsInFlight);
   PREAD(sname,svalue,szRegistryLoggerShort,&LoggerShortName);
   PREAD(sname,svalue,szRegistryMapBox,&MapBox);
-
+  if (matchedstring) {
+    return;
+  }
+  
   PREAD(sname,svalue,szRegistryMapFile,&*szMapFile, array_size(szMapFile));
   if (matchedstring) {
     RemoveFilePathPrefix(_T("%LOCAL_PATH%"), szMapFile);
@@ -546,7 +552,11 @@ void LKParseProfileString(const char *sname, const char *svalue) {
   unsigned dwIdxPort;
   PREAD(sname,svalue,szRegistryPort1Index,&dwIdxPort);
     if(matchedstring) {
-        if(COMMPort.size() == 0) {
+#ifdef ANDROID
+      ScopeLock lock(COMMPort_mutex);
+#endif
+
+      if(COMMPort.size() == 0) {
             RefreshComPortList();
         }
         if(dwIdxPort < COMMPort.size()) {
@@ -557,7 +567,10 @@ void LKParseProfileString(const char *sname, const char *svalue) {
   
   PREAD(sname,svalue,szRegistryPort2Index,&dwIdxPort);
     if(matchedstring) {
-        if(COMMPort.size() == 0) {
+#ifdef ANDROID
+      ScopeLock lock(COMMPort_mutex);
+#endif
+      if(COMMPort.size() == 0) {
             RefreshComPortList();
         }
         if(dwIdxPort < COMMPort.size()) {
@@ -644,7 +657,9 @@ void LKParseProfileString(const char *sname, const char *svalue) {
   PREAD(sname,svalue,szRegistryTeamcodeRefWaypoint,&TeamCodeRefWaypoint);
   PREAD(sname,svalue,szRegistryTerrainBrightness,&TerrainBrightness);
   PREAD(sname,svalue,szRegistryTerrainContrast,&TerrainContrast);
-
+  if (matchedstring) {
+    return;
+  }
   PREAD(sname,svalue,szRegistryTerrainFile,szTerrainFile, array_size(szTerrainFile));
   if (matchedstring) {
     RemoveFilePathPrefix(_T("%LOCAL_PATH%"), szTerrainFile);
@@ -683,8 +698,8 @@ void LKParseProfileString(const char *sname, const char *svalue) {
 
   PREAD(sname,svalue,szRegistryUseUngestures,&UseUngestures);
   PREAD(sname,svalue,szRegistryUseTotalEnergy,&UseTotalEnergy_Config);
-  if (matchedstring) return;
   PREAD(sname,svalue,szRegistryWarningTime,&WarningTime);
+  if (matchedstring) return;
 
   PREAD(sname,svalue,szRegistryWayPointFile,szWaypointFile, array_size(szWaypointFile));
   if (matchedstring) {

@@ -1,108 +1,78 @@
-#B0;
+#B7;
 [Welcome to LK8000]
-Hello! You have just installed or updated LK8000, and starting from this version we can provide more informations about changes and improvements.
-Join our free support forum at http://www.postfrontal.com/forum
+Hello! It seems that you have just installed or updated LK8000, and here we can provide more informations about changes and improvements.
+Join our free support forum at www.postfrontal.com/forum
 
 
 This info dialog that you are reading can be found on:
 Menu - Info 2/2 - INFO button
 
 There are several pages that you can scroll using Next and Prev buttons.
-Please advance to the next page to start reading about changes and enhancements.
+Please ADVANCE TO THE NEXT PAGE to start reading about changes and enhancements.
 
+[version 6.1r changes from 6.0]
 
-[Latest software changes]
+. NEW device VAULTER
 
-Version 6.1g:
-Fixed profile reset not working in 6.1f
-Fixed crash on PNA version using internal GPS device
-Other bug fixes and performance enhancements
+. Unknown airspace types are loaded as "other".
 
+. Optimized screen layout on portrait. 
 
-In summary what's up in current branch:
+. New "Info Box" distance to turnpoint radius available
 
-Airspace Class Glider Sector "GldSec" added (GSEC open airspace, GLIDING OpenAIP)
-Up to 6 devices can now be set in Device configuration
-New Aircraft symbols in Aircraft configuration, choose the best for you!
-New tracking mode in Pilot configuration
-Android screen orientation in System config p.22
-New terrain auto-contrast in System config p.4
-New Screen View menus LUMEN +- to make terrain colors lighter or darker in realtime.
-   (Setting is automatically saved to profile if Save Runtime is enabled in System menu 22).
+. AIRSPACE Class Glider Sector "GldSec" added (GSEC open airspace, GLIDING OpenAIP)
 
-[Version 6.1f  170407]
-New INFO button in menu Info 2/2 .
-(informations will automatically be displayed on first restart of LK after upgrade, if available)
+. Up to 6 DEVICES can now be set in Device configuration
 
-New Screen View menus LUMEN +- to make terrain colors lighter or darker in realtime.
-(Setting is automatically saved to profile if Save Runtime is enabled in System menu 22).
+. NEW AIRCRAFT SHAPES in Aircraft configuration, choose the best for you!
 
-Profiles are now compatible between all platforms, and can be copied from a PNA to Android for example.
+. TERRAIN AUTO-CONTRAST in System config p.4
+  If ON, contrast and brightness are automatically adjusted for best results, dynamically.
 
-Disabled airspaces are painted with a grey line, not black. Good expecially on Kobo.
+. TERRAIN LUMEN: Screen View menus LUMEN +- to make terrain colors lighter or darker in realtime.
+  (Setting is automatically saved to profile if Save Runtime is enabled in System menu 22).
 
-Bugfix "GPS NO FIX" on some smartphones.
-Bugfix LX Nano task declaration on 64bit devices
-Bugfix on loading AIRCRAFT profiles
-Bugfix with EW logger
-Bluetooth fixes on android
-BugFix missing topology icons
-Many critical bug fixes leading to crashes
-Many internal fixes and improvements.
+. TERRAIN LOADING, on all platforms you can load any DEM size. NO MORE LIMITS.
 
-Please advance to next item to see informations about previous versions.
+. Added units feet/minute (ft/min)
+  Changing system units does not require restart anymore
 
-[Version 6.1e 170310]
-Fix default task not loaded automatically if missing
-Many important bug fixes leading to possible crashes, and stability issues.
+. Check List : allow to use "Latin 1" encoded file.
+. Support utf8 encoded Waypoint file
+. Topology labels use native UTF8 language and symbols
 
+. New INFO button in menu Info 2/2 .
+  (informations will automatically be displayed on first restart of LK after upgrade, if available)
 
-[Version 6.1d 170228]
-New tracking mode in Pilot configuration.
-Here you can select how you want to be tracked.
-in flight only: tracking starts after takeoff and ends after landing detection.
-permanent: tracking as long as LK8000 runs and has a valid GPS signal.
-We recomend in flight only because it transfers the takeoff and landing information for a correct log. (default)
-while permanent can be used to test your tracking settings on ground. (Note: Tracking need a falid GPS fix)
----
-New Snail trail (the colored track), size rescaled correctly on android
-Snail trail size changes are immediate, no need to restart LK.
-Better FAI optimizer
----
-FAI analysis, grid scale made better.
----
-Device configuration, new buttons Led style
----
-GPS Altitude offset is moved to engineering mode.
-Other minor cosmetic changes
----
+(ANDROID ONLY)
+.  IOIO board support
+    Uart 0: pin3=out, pin4=in
+    Uart 1: pin5=out, pin6=in
+    Uart 2: pin10=out, pin11=in
+    Uart 3: pin12=out, pin13=in
+. Screen orientation in System config p.22
 
-Fix wrong track value in replay mode with WGS84 earth model
-Fix waypoint names in OpenAIP
-Fix bug in menu buttons showing inverted status of Total energy in use
-Fix bug from v6.0, reloading fonts when not needed upon exiting config
+. PROFILES are now compatible between all platforms, and can be copied from a PNA to Android for example.
 
-Many bug fixes leading to possible crashes
+. New TRACKING mode in Pilot configuration.
+  Here you can select how you want to be tracked.
+  in flight only: tracking starts after takeoff and ends after landing detection.
+  permanent: tracking as long as LK8000 runs and has a valid GPS signal.
+  We recommend in flight only because it transfers the takeoff and landing information for a correct log. (default)
+  while permanent can be used to test your tracking settings on ground. (Note: Tracking need a falid GPS fix)
 
-[Version 6.1c 170228]
+. FAI optimizer has been improved
+. FAI analysis, grid scale made better.
 
-Android BlueTooth fixes
-Android screen orientation in System menu 22.
-Terrain auto-contrast in System config page 4
-If ON, contrast and brightness are automatically adjusted for best results, dynamically.
+. GPS Altitude offset was moved to engineering mode.
 
-Terrain quantization reworked
-
-Refresh heading waypoints on dialog only every 5 seconds, not every second, otherwise no chance to select anything!
-New glider symbol "Black glider" in Aircraft setup.
-
-Iphone gestures configuration moved to engineering, default is now Normal, as on all smartphones.
-
+Many minor bug fixes and performance enhancements.
 
 
 [Team Announces]
 For suggestions, bug reporting, any question, please join our free support forum at:
-www.postfrontal.com/forum/default.asp?CAT_ID=11
+www.postfrontal.com/forum
+(LK8000 International Support forum)
 
 
 
@@ -140,12 +110,14 @@ Oren Cohen
 Jozef Hartinger
 Max Kellermann
 Kuba Kubrynski
+Shachar Liberman
 Richard Pecl
 Mateusz Pusz
 Alberto Realis-Luc
 Tony Tarsi
 Kalman Rozsahegyi
 Karim Trojette
+
 
 Graphics by Jiri Bergman
 Complete copyrights and contributors list is available on the main website.

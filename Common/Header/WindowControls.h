@@ -150,6 +150,8 @@ class DataField{
   virtual void addEnumTextNoLF(const TCHAR *Text) { assert(false); }
   virtual void Sort(int startindex=0) { assert(false); }
 
+  virtual int Find(const TCHAR *Text) { assert(false); return -1; }
+
   void Use(void){
     mUsageCounter++;
   }
@@ -272,6 +274,8 @@ class DataFieldEnum: public DataField {
   void addEnumTextNoLF(const TCHAR *Text) override;
   void addEnumText(const TCHAR *Text, const TCHAR *Label) override ;
 
+  int Find(const TCHAR *Text) override ;
+
   int GetAsInteger(void) override;
   const TCHAR *GetAsString(void) override;
   const TCHAR *GetAsDisplayString(void) override;
@@ -321,8 +325,15 @@ class DataFieldFileReader: public DataField {
   void Dec(void) override;
   int CreateComboList(void) override;
 
+  /**
+   * 
+   * @param fname : text to display in combo list
+   * @param fpname : file Path relative ScanDirectoryTop @subdir
+   */
   void addFile(const TCHAR *fname, const TCHAR *fpname);
-  bool checkFilter(const TCHAR *fname, const TCHAR* filter);
+  
+  
+  static bool checkFilter(const TCHAR *fname, const TCHAR* filter);
   int GetNumFiles(void);
 
   int GetAsInteger(void) override;
@@ -330,7 +341,17 @@ class DataFieldFileReader: public DataField {
 
   int GetLabelIndex(const TCHAR* label);
 
+  /**
+   * find and select existing item.
+   * 
+   * @param text : file Path relative ScanDirectoryTop @subdir
+   * @return : true if item exists
+   */
   bool Lookup(const TCHAR* text);
+  
+  /**
+   * @return file Path relative ScanDirectoryTop @subdir
+   */
   const TCHAR* GetPathFile(void) const;
 
   void Set(int Value) override;
@@ -649,7 +670,6 @@ class WndFrame:public WindowControl{
 
 
     virtual bool OnLButtonDown(const POINT& Pos);
-    virtual bool OnLButtonUp(const POINT& Pos);
 
     virtual void Paint(LKSurface& Surface);
 
@@ -701,7 +721,9 @@ class WndListFrame:public WndFrame{
     void RedrawScrolled(bool all);
     bool RecalculateIndices(bool bigscroll);
     void Redraw(void);
-    int GetItemIndex(void){return(mListInfo.ItemIndex);}
+    int GetItemIndex(void) { 
+      return (mListInfo.ScrollIndex + mListInfo.ItemIndex);
+    }
     void SetItemIndexPos(int iValue);
     void SetItemIndex(int iValue);
     void SelectItemFromScreen(int xPos, int yPos, RECT *rect, bool select);
@@ -740,7 +762,8 @@ private:
     POINT mScrollStart;
     int mMouseScrollBarYOffset; // where in the scrollbar button was mouse down at
     bool mMouseDown;
-    bool mCaptureScrollButton;
+    bool mCaptureScrollButton; // scrolling using scrollbar in progress
+    bool mCaptureScroll; // "Smartphone like" scrolling in progress
 
 };
 
@@ -782,6 +805,7 @@ class WndForm:public WindowControl{
     typedef bool (*OnTimerNotify_t)(WndForm* pWnd);
     typedef bool (*OnKeyDownNotify_t)(WndForm* pWnd, unsigned KeyCode);
     typedef bool (*OnKeyUpNotify_t)(WndForm* pWnd, unsigned KeyCode);
+    typedef bool (*OnUser_t)(WndForm* pWndForm, unsigned id);
 
   protected:
 
@@ -798,6 +822,7 @@ class WndForm:public WindowControl{
     OnTimerNotify_t mOnTimerNotify;
     OnKeyDownNotify_t mOnKeyDownNotify;
     OnKeyUpNotify_t mOnKeyUpNotify;
+    OnUser_t mOnUser;
 
     virtual void Paint(LKSurface& Surface) override;
 
@@ -853,7 +878,11 @@ class WndForm:public WindowControl{
         }
     }
 
-    void ReinitialiseLayout(const RECT& Rect) { }
+    void SetOnUser(OnUser_t OnUser) {
+        mOnUser = OnUser;
+    }
+
+  void ReinitialiseLayout(const RECT& Rect) { }
 
 protected:
     bool OnKeyDownNotify(Window* pWnd, unsigned KeyCode);
@@ -866,6 +895,10 @@ protected:
         if(mOnTimerNotify) {
             mOnTimerNotify(this);
         }
+    }
+
+    bool OnUser(unsigned id) override {
+      return (mOnUser && mOnUser(this, id));
     }
 
     virtual void OnDestroy() override {

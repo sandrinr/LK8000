@@ -9,65 +9,58 @@
 #include "externs.h"
 #include "NavFunctions.h"
 
+void FillGlideFootPrint(double latitude, double longitude, double altitude, DERIVED_INFO *Calculated, double max_range,  pointObj* out, size_t count) {
+
+  const pointObj* first_out = out; // this is first polygon point (OpenGL or not), used for close polygon.
+  for (size_t i = 0; i < count; ++i) {
+    const double bearing = (i*360.0)/count;
+    double lat, lon;
+    bool out_of_range = false;
+    const double distance = FinalGlideThroughTerrain(bearing, latitude, longitude, altitude,
+                                        Calculated, &lat, &lon, max_range, &out_of_range, nullptr );
+    if (out_of_range) {
+      FindLatitudeLongitude(latitude, longitude, bearing, distance, &lat, &lon);
+    }
+    *(out++) = (pointObj){lon, lat, 0};
+  }
+  (*out) = (*first_out); // close polygon
+}
+
 
 void TerrainFootprint(NMEA_INFO *Basic, DERIVED_INFO *Calculated) {
-  double bearing, distance;
-  double lat, lon;
-  bool out_of_range;
-  #ifdef GTL2
-  double ScreenRange = MapWindow::GetApproxScreenRange();
-  #endif
+
+  const double ScreenRange = MapWindow::GetApproxScreenRange();
 
   // estimate max range (only interested in at most one screen distance away)
   // except we need to scan for terrain base, so 20km search minimum is required
-  #ifdef GTL2
   double mymaxrange = max(20000.0, ScreenRange);
-  #else
-  double mymaxrange = max(20000.0, MapWindow::GetApproxScreenRange());
-  #endif
 
   Calculated->TerrainBase = Calculated->TerrainAlt;
 
 
   pointObj* out = Calculated->GlideFootPrint;
 
+  // this exist only for allow static_assert, compil time error instead of runtime error.
+  const decltype(Calculated->GlideFootPrint) GlideFootPrint_Test = {};
+  
 #ifdef ENABLE_OPENGL
-  LKASSERT(array_size(Calculated->GlideFootPrint) >= NUMTERRAINSWEEPS +2); // #GlideFootPrint array to small
+  static_assert(array_size(GlideFootPrint_Test) == NUMTERRAINSWEEPS +2, "#GlideFootPrint invalid array size");
   // first point is current poisition
   *(out++) = (pointObj){Basic->Longitude,Basic->Latitude};
 #else
-  LKASSERT(array_size(Calculated->GlideFootPrint) >= NUMTERRAINSWEEPS +1); // #GlideFootPrint array to small  
+  static_assert(array_size(GlideFootPrint_Test) == NUMTERRAINSWEEPS +1, "#GlideFootPrint invalid array size");
 #endif
-
-  const pointObj* first_out = out; // this is first polygon point (OpenGL or not), used for close polygon.
-  for (int i=0; i<NUMTERRAINSWEEPS; i++) {
-    bearing = (i*360.0)/NUMTERRAINSWEEPS;
-    distance = FinalGlideThroughTerrain(bearing, 
-                                      #ifdef GTL2
-                                        Basic->Latitude,
-                                        Basic->Longitude,
-                                        Calculated->NavAltitude,
-                                      #else
-                                        Basic, 
-                                      #endif
-                                        Calculated, &lat, &lon,
-                                        mymaxrange, &out_of_range,
-					&Calculated->TerrainBase);
-    if (out_of_range) {
-      FindLatitudeLongitude(Basic->Latitude, Basic->Longitude, 
-                            bearing, 
-                            distance,	 // limited, originally maxrange and more..
-                            &lat, &lon);
-    }
-    *(out++) = (pointObj){lon, lat};
-  }
-  (*out) = (*first_out); // close polygon
-
-  Calculated->Experimental = Calculated->TerrainBase;
   
-  #ifdef GTL2
+  if(FinalGlideTerrain) {
+    FillGlideFootPrint(Basic->Latitude, Basic->Longitude, Calculated->NavAltitude, Calculated, mymaxrange, out, NUMTERRAINSWEEPS);
+    Calculated->GlideFootPrint_valid = true;
+  } else {
+    Calculated->GlideFootPrint_valid = false;  
+  }
 
   LockTaskData();
+  
+  bool GlideFootPrint2_valid = false;
   
   // Now calculate the 2nd glide footprint, which is the glide range
   // after reaching the next task waypoint.  First, let's make sure
@@ -103,7 +96,7 @@ void TerrainFootprint(NMEA_INFO *Basic, DERIVED_INFO *Calculated) {
     // Calculate arrival altitude relative to the "terrain height"
     // safety setting.
 
-    double alt_arriv_agl = (CheckSafetyAltitudeApplies(wp_index)) ?
+    const double alt_arriv_agl = (CheckSafetyAltitudeApplies(wp_index)) ?
            (alt_arriv + (SAFETYALTITUDEARRIVAL/10)) : alt_arriv;
 
     // relative to "terrain height":
@@ -126,27 +119,14 @@ void TerrainFootprint(NMEA_INFO *Basic, DERIVED_INFO *Calculated) {
       DistanceBearing(lat_wp, lon_wp, PanLatitude,
                       PanLongitude, &mymaxrange, NULL);
       mymaxrange += ScreenRange;
-      
-      for (int i=0; i<=NUMTERRAINSWEEPS; i++) {
-        bearing = (i * 360.0) / NUMTERRAINSWEEPS;
+   
+      FillGlideFootPrint(lat_wp, lon_wp, alt_arriv_msl, Calculated, mymaxrange, Calculated->GlideFootPrint2, NUMTERRAINSWEEPS);
+      GlideFootPrint2_valid = true;
 
-        distance = FinalGlideThroughTerrain(bearing, lat_wp, lon_wp,
-                                            alt_arriv_msl,
-                                            Calculated, &lat, &lon,
-                                            mymaxrange, &out_of_range,
-                                            NULL);
-
-        if (out_of_range)
-          FindLatitudeLongitude(lat_wp, lon_wp, 
-                                bearing, distance,
-                                &lat, &lon);
-
-        GlideFootPrint2[i].x = lon;
-        GlideFootPrint2[i].y = lat;
-      }
     } // if reachable above "terrain height"
   } // if valid task point
+  Calculated->GlideFootPrint2_valid = GlideFootPrint2_valid;
+  
   UnlockTaskData();
-  #endif
 }
 

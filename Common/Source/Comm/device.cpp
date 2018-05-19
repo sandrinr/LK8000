@@ -32,7 +32,12 @@
 #include "Java/String.hxx"
 #include "Android/InternalPort.h"
 #include "Android/BluetoothHelper.hpp"
+#include "Android/UsbSerialHelper.h"
 #include <sstream>
+#include <Android/Main.hpp>
+#include <Android/IOIOUartPort.h>
+#include <Android/UsbSerialPort.h>
+
 #endif
 
 
@@ -54,40 +59,11 @@ using namespace std::placeholders;
 //  Thankfully WinCE "critical sections" are recursive locks.
 
 // this lock is used for protect DeviceList array.
-#if USELKASSERT
-class DeviceMutex : protected Poco::Mutex {
-    friend class DeviceScopeLock;
-    friend class Poco::ScopedLock<DeviceMutex>;
-public:
-    inline void Lock(const TCHAR* filename, int line) {
-        Poco::Mutex::lock();
-        // Check if we are not inside RXThread, otherwise, we can have deadlock when we stop RxThread.
-        for(DeviceDescriptor_t device : DeviceList) {
-            if(device.Com) {
-                if(device.Com->IsCurrentThread()) {
-                    StartupStore(_T("Err. LockComm inside RxThread %s  line(%d)"), filename, line);
-                    assert(false);
-                }
-            }
-        }
-    }
-    
-    inline void Unlock() { 
-        Poco::Mutex::unlock(); 
-    }    
-};
+static Mutex CritSec_Comm;
 
-class DeviceScopeLock : public Poco::ScopedLock<DeviceMutex> {
-public:
-    DeviceScopeLock(DeviceMutex& m) : Poco::ScopedLock<DeviceMutex>(m) { }
-
-};
-#else
-typedef Mutex DeviceMutex;
-typedef ScopeLock DeviceScopeLock;
+#ifdef ANDROID
+Mutex COMMPort_mutex; // needed for Bluetooth LE scan
 #endif
-static DeviceMutex  CritSec_Comm;        
-
 COMMPort_t COMMPort;
 
 static  const unsigned   dwSpeed[] = {1200,2400,4800,9600,19200,38400,57600,115200};
@@ -100,15 +76,9 @@ DeviceDescriptor_t *pDevSecondaryBaroSource=NULL;
 
 int DeviceRegisterCount = 0;
 
-#if USELKASSERT
-void LockComm_d(const TCHAR* filename, int line) {
-  CritSec_Comm.Lock(filename, line);
-}
-#else
 void LockComm() {
   CritSec_Comm.Lock();
 }
-#endif
 
 void UnlockComm() {
   CritSec_Comm.Unlock();
@@ -127,7 +97,7 @@ BOOL for_all_device(BOOL (*(DeviceDescriptor_t::*func))(DeviceDescriptor_t* d)) 
     }
     unsigned nbDeviceFailed = 0;
 
-    DeviceScopeLock Lock(CritSec_Comm);
+    ScopeLock Lock(CritSec_Comm);
     for( DeviceDescriptor_t& d : DeviceList) {
         if( !d.Disabled && d.Com && (d.*func) ) {
           nbDeviceFailed +=  (d.*func)(&d) ? 0 : 1;
@@ -150,7 +120,7 @@ BOOL for_all_device(BOOL (*(DeviceDescriptor_t::*func))(DeviceDescriptor_t* d, _
     }
     unsigned nbDeviceFailed = 0;
 
-    DeviceScopeLock Lock(CritSec_Comm);
+    ScopeLock Lock(CritSec_Comm);
     for( DeviceDescriptor_t& d : DeviceList) {
         if( !d.Disabled && d.Com && (d.*func) ) {
           nbDeviceFailed +=  (d.*func)(&d, Val1) ? 0 : 1;
@@ -171,7 +141,7 @@ BOOL for_all_device(BOOL (*(DeviceDescriptor_t::*func))(DeviceDescriptor_t* d, _
     }
     unsigned nbDeviceFailed = 0;
 
-    DeviceScopeLock Lock(CritSec_Comm);
+    ScopeLock Lock(CritSec_Comm);
     for( DeviceDescriptor_t& d : DeviceList) {
         if( !d.Disabled && d.Com && (d.*func) ) {
           nbDeviceFailed +=  (d.*func)(&d, Val1, Val2) ? 0 : 1;
@@ -266,6 +236,10 @@ static BOOL devIsFalseReturn(PDeviceDescriptor_t d){
 }
 
 void RefreshComPortList() {
+#ifdef ANDROID
+    ScopeLock lock(COMMPort_mutex);
+#endif
+
     COMMPort.clear();
 #ifdef WIN32    
     TCHAR szPort[10];
@@ -289,7 +263,7 @@ void RefreshComPortList() {
 #endif
 #endif
     
-#ifdef __linux__
+#if defined(__linux__) && !defined(ANDROID)
   
   struct dirent **namelist;
   int n;
@@ -374,36 +348,67 @@ void RefreshComPortList() {
 
 #ifdef ANDROID
 
-    JNIEnv *env = Java::GetEnv();
-    if(env && BluetoothHelper::isEnabled(env)) {
+  JNIEnv *env = Java::GetEnv();
+  if (env) {
+    if (BluetoothHelper::isEnabled(env)) {
 
-        COMMPort.push_back(_T("Bluetooth Server"));
+      COMMPort.push_back(_T("Bluetooth Server"));
 
 
-        jobjectArray jbonded = BluetoothHelper::list(env);
-        if (jbonded) {
-            Java::LocalRef<jobjectArray> bonded(env, jbonded);
+      jobjectArray jbonded = BluetoothHelper::list(env);
+      if (jbonded) {
+        Java::LocalRef<jobjectArray> bonded(env, jbonded);
 
-            jsize nBT = env->GetArrayLength(bonded) / 2;
-            for (jsize i = 0; i < nBT; ++i) {
-                Java::String j_address(env, (jstring) env->GetObjectArrayElement(bonded, i * 2));
-                if(!j_address)
-                    continue;
+        jsize nBT = env->GetArrayLength(bonded) / 2;
+        for (jsize i = 0; i < nBT; ++i) {
+          Java::String j_address(env, (jstring) env->GetObjectArrayElement(bonded, i * 2));
+          if (!j_address)
+            continue;
 
-                const std::string address = j_address.ToString();
-                if (address.empty())
-                    continue;
+          const std::string address = j_address.ToString();
+          if (address.empty())
+            continue;
 
-                Java::String j_name(env, (jstring) env->GetObjectArrayElement(bonded, i * 2 + 1));
-                std::stringstream prefixed_address, name;
+          Java::String j_name(env, (jstring) env->GetObjectArrayElement(bonded, i * 2 + 1));
+          std::stringstream prefixed_address, name;
 
-                prefixed_address << "BT:" << address;
-                name << "BT:" << ( j_name ? j_name.ToString() : std::string() );
+          prefixed_address << "BT:" << address;
+          name << "BT:" << (j_name ? j_name.ToString() : std::string());
 
-                COMMPort.push_back(COMMPortItem_t(prefixed_address.str(), name.str()));
-            }
+          COMMPort.push_back(COMMPortItem_t(prefixed_address.str(), name.str()));
         }
+      }
     }
+
+    if(UsbSerialHelper::isEnabled(env)) {
+      jobjectArray jdevices = UsbSerialHelper::list(env);
+      if (jdevices) {
+        Java::LocalRef<jobjectArray> devices(env, jdevices);
+
+        const jsize device_count = env->GetArrayLength(devices);
+        for (jsize i = 0; i < device_count; ++i) {
+
+          Java::String j_name(env, (jstring) env->GetObjectArrayElement(devices, i));
+          if (!j_name) {
+            continue;
+          }
+
+          std::stringstream prefixed_name;
+          prefixed_name << "USB:" << j_name.ToString();
+          const std::string name = prefixed_name.str();
+          COMMPort.push_back(COMMPortItem_t(name.c_str(), name.c_str()));
+        }
+      }
+    }
+  }
+
+  if(ioio_helper) {
+    COMMPort.push_back(COMMPortItem_t("IOIOUart_0", "IOIO Uart 0"));
+    COMMPort.push_back(COMMPortItem_t("IOIOUart_1", "IOIO Uart 1"));
+    COMMPort.push_back(COMMPortItem_t("IOIOUart_2", "IOIO Uart 2"));
+    COMMPort.push_back(COMMPortItem_t("IOIOUart_3", "IOIO Uart 3"));
+  }
+
 #endif
 
     if(COMMPort.empty()) {
@@ -553,8 +558,13 @@ BOOL devInit() {
             ReadPortSettings(i, Port, &SpeedIndex, &BitIndex);
         }
         // remember: Port1 is the port used by device A, port1 may be Com3 or Com1 etc
-
-        if(std::find(UsedPort.begin(), UsedPort.end(), Port) != UsedPort.end()) {
+        if ((_tcsncmp(Port, _T("COM"),3)           == 0) ||
+            (_tcsncmp(Port, _T("IOIOUart_"), 9)    == 0) ||
+            (_tcsncmp(Port, _T("USB:"), 4)         == 0) ||
+            (_tcscmp(Port, _T("Bluetooth Server")) == 0)
+           )
+        {  // shared ports for COM Ports only
+          if(std::find(UsedPort.begin(), UsedPort.end(), Port) != UsedPort.end()) {
             unsigned int j;
             for( j = 0; j < i ; j++)
             {
@@ -578,6 +588,7 @@ BOOL devInit() {
               }
             }
             continue;
+          }
         }
         UsedPort.insert(Port);
         
@@ -631,6 +642,15 @@ BOOL devInit() {
         } else if (_tcscmp(Port, _T("Bluetooth Server")) == 0) {
 #ifdef ANDROID
             Com = new BluetoothServerPort(i, Port);
+#endif
+        } else if(_tcsncmp(Port, _T("IOIOUart_"), 9) == 0) {
+#ifdef ANDROID
+            unsigned ID = _tcstoul(Port+9, nullptr, 10);
+            Com = new IOIOUartPort(i, Port, ID, dwSpeed[SpeedIndex]);
+#endif
+        } else if (_tcsncmp(Port, _T("USB:"), 4) == 0) {
+#ifdef ANDROID
+          Com = new UsbSerialPort(i, &Port[4], dwSpeed[SpeedIndex], BitIndex);
 #endif
         } else {
             Com = new SerialPort(i, Port, dwSpeed[SpeedIndex], BitIndex, PollingMode);
@@ -700,7 +720,7 @@ static BOOL devClose(PDeviceDescriptor_t d)
         Com->Close();
         delete Com;
       }
-      d->Com = NULL; // if we do that before Stop RXThread , Crash ....
+      d->Com = nullptr; // if we do that before Stop RXThread , Crash ....
 
     }    
   }
@@ -719,13 +739,13 @@ BOOL devCloseAll(void){
      * 
      * Bruno.
      */
-  LockComm();
   for (unsigned i=0; i<NUMDEV; i++){
+    LockComm();
     devClose(&DeviceList[i]);
     DeviceList[i].Status=CPS_CLOSED; // 100210
+    UnlockComm();
   }
-  UnlockComm();
-  
+
   return(TRUE);
 }
 
@@ -953,39 +973,34 @@ BOOL devIsLogger(PDeviceDescriptor_t d)
   return result;
 }
 
-BOOL devIsGPSSource(PDeviceDescriptor_t d)
-{
-  BOOL result = FALSE;
-
-  LockComm();
-  if ((d != NULL) && (d->IsGPSSource != NULL))
-    result = d->IsGPSSource(d);
-  UnlockComm();
-
-  return result;
+/**
+ * used only in UpdateMonitor() : already under LockComm ...
+ */
+BOOL devIsGPSSource(PDeviceDescriptor_t d) {
+  if (d && d->IsGPSSource) {
+    return d->IsGPSSource(d);
+  }
+  return false;
 }
 
-BOOL devIsBaroSource(PDeviceDescriptor_t d)
-{
-  BOOL result = FALSE;
-
-  LockComm();
-  if ((d != NULL) && (d->IsBaroSource != NULL))
-    result = d->IsBaroSource(d);
-  UnlockComm();
-
-  return result;
+/**
+ * used only in devInit() and UpdateMonitor() : already under LockComm ...
+ */
+BOOL devIsBaroSource(PDeviceDescriptor_t d) {
+  if (d && d->IsBaroSource) {
+    return d->IsBaroSource(d);
+  }
+  return false;
 }
 
-BOOL devIsRadio(PDeviceDescriptor_t d)
-{
-  BOOL result = FALSE;
-  LockComm();
-  if ((d != NULL) && (d->IsRadio != NULL))
-    result = d->IsRadio(d);
-  UnlockComm();
-
-  return result;
+/**
+ * used only in devInit() : already under LockComm ...
+ */
+BOOL devIsRadio(PDeviceDescriptor_t d) {
+  if (d && d->IsRadio) {
+    return d->IsRadio(d);
+  }
+  return false;
 }
 
 
@@ -1075,11 +1090,12 @@ void devWriteNMEAString(PDeviceDescriptor_t d, const TCHAR *text)
 #ifdef RADIO_ACTIVE
 
 bool devDriverActivated(const TCHAR *DeviceName) {
-  for(int i=0; i <NUMDEV; i++)
+  for(int i=0; i <NUMDEV; i++) {
     if ((_tcscmp(dwDeviceName[i], DeviceName) == 0)) {
             return true;        
     }
-    return false;
+  }
+  return false;
 }
 
 /**
@@ -1131,7 +1147,7 @@ BOOL devPutFreqSwap() {
 BOOL devPutFreqActive(double Freq, TCHAR StationName[]) {
   if (SIMMODE) {
     RadioPara.ActiveFrequency=  Freq;
-    _stprintf( RadioPara.ActiveName, _T("%s") , StationName);
+    _sntprintf( RadioPara.ActiveName, NAME_SIZE,_T("%s") , StationName);
     return TRUE;
   }
   return for_all_device(&DeviceDescriptor_t::PutFreqActive, Freq, StationName);
@@ -1148,7 +1164,7 @@ BOOL devPutFreqActive(double Freq, TCHAR StationName[]) {
 BOOL devPutFreqStandby(double Freq,TCHAR  StationName[]) {
   if (SIMMODE) {
      RadioPara.PassiveFrequency=  Freq;
-     _stprintf( RadioPara.PassiveName, _T("%s") , StationName);
+     _sntprintf( RadioPara.PassiveName, NAME_SIZE,_T("%s") , StationName);
     return TRUE;
   }
   return for_all_device(&DeviceDescriptor_t::PutFreqStandby, Freq, StationName);

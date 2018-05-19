@@ -2,11 +2,6 @@ cmake_minimum_required(VERSION 3.4.1)
 
 project(assembler C CXX ASM)
 
-if (${ANDROID_ABI} STREQUAL "armeabi-v7a")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mfpu=neon")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mfpu=neon")
-endif ()
-
 include(ExternalProject)
 
 set(GEOGRAPHIC_PREFIX ${CMAKE_CURRENT_LIST_DIR}/android-studio/app/Thirdparty/GeographicLib)
@@ -23,8 +18,8 @@ endif ()
 
 ExternalProject_Add (
     GeographicLib
-    URL https://netcologne.dl.sourceforge.net/project/geographiclib/distrib/GeographicLib-1.47-patch1.tar.gz
-    URL_HASH MD5=4fadb45c713ed87b3fc0c709cd9eba26
+    URL https://netcologne.dl.sourceforge.net/project/geographiclib/distrib/GeographicLib-1.48.tar.gz
+    URL_HASH MD5=e99153cf41bf64998cc4f91c00aea167
     PREFIX ${GEOGRAPHIC_PREFIX}
     BINARY_DIR ${GEOGRAPHIC_PREFIX}/build/${ANDROID_ABI}
     INSTALL_DIR ${GEOGRAPHIC_PREFIX}/lib/${ANDROID_ABI}
@@ -54,8 +49,8 @@ set(BOOST_PREFIX ${CMAKE_CURRENT_LIST_DIR}/android-studio/app/Thirdparty/boost)
 
 ExternalProject_Add (
     boost
-    URL https://freefr.dl.sourceforge.net/project/boost/boost/1.63.0/boost_1_63_0.zip
-    URL_HASH MD5=3c706b3fc749884ea5510c39474fd732
+    URL https://dl.bintray.com/boostorg/release/1.64.0/source/boost_1_64_0.zip
+    URL_HASH SHA256=b99973c805f38b549dbeaf88701c0abeff8b0e8eaa4066df47cac10a32097523
     PREFIX ${BOOST_PREFIX}
     UPDATE_COMMAND ""
     PATCH_COMMAND ""
@@ -68,7 +63,7 @@ ExternalProject_Get_Property(boost source_dir)
 set(BOOST_INCLUDE ${source_dir})
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -std=c++11 -fexceptions -frtti -Wall -fopenmp")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wparentheses -Wuninitialized")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wparentheses -Wuninitialized -Wredundant-decls")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBOOST_NO_IOSTREAM -DBOOST_NO_IOSFWD -DBOOST_NO_STRINGSTREAM -DBOOST_NO_WSTREAMBUF ")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__linux__ -DHAVE_POSIX -DANDROID -D__STDC_FORMAT_MACROS ")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DENABLE_OPENGL -DHAVE_GLES -DGL_GLEXT_PROTOTYPES ")
@@ -93,17 +88,23 @@ add_library( LK8000 SHARED
     Common/Source/xcs/Android/NativeInputListener.cpp
     Common/Source/xcs/Android/NativePortListener.cpp
 
+    Common/Source/xcs/Android/IOIOHelper.cpp
+
     Common/Source/xcs/Java/String.cxx
     Common/Source/xcs/Java/Global.cxx
     Common/Source/xcs/Java/File.cxx
     Common/Source/xcs/Java/Object.cxx
     Common/Source/xcs/Java/Exception.cxx
 
-
     Common/Source/Android/Main.cpp
     Common/Source/Android/InternalPort.cpp
     Common/Source/Android/AndroidPort.cpp
     Common/Source/Android/BluetoothPort.cpp
+
+    Common/Source/Android/IOIOUartPort.cpp
+
+    Common/Source/Android/UsbSerialHelper.cpp
+    Common/Source/Android/UsbSerialPort.cpp
 
     Common/Source/Window/WndMain.cpp
 
@@ -595,8 +596,6 @@ add_library( LK8000 SHARED
     Common/Source/Devices/devCondor.cpp
     Common/Source/Devices/devDigifly.cpp
     Common/Source/Devices/devDisabled.cpp
-    Common/Source/Devices/devDSX.cpp
-    Common/Source/Devices/devEye.cpp
     Common/Source/Devices/devEW.cpp
     Common/Source/Devices/devEWMicroRecorder.cpp
     Common/Source/Devices/devFlymasterF1.cpp
@@ -630,6 +629,7 @@ add_library( LK8000 SHARED
     Common/Source/Devices/devGPSBip.cpp
     Common/Source/Devices/devAR620x.cpp
     Common/Source/Devices/devATR833.cpp
+    Common/Source/Devices/devVaulter.cpp
 
     Common/Source/Dialogs/AddCustomKeyList.cpp
     Common/Source/Dialogs/dlgAirspace.cpp
@@ -777,9 +777,31 @@ add_library( LK8000 SHARED
     Common/Source/Sound/Android/Sound.cpp
 
     Common/Source/Resource/resource_data.S
-    Common/Source/Resource/resource_bmp.S
     Common/Source/Resource/resource_xml.S
 )
+
+# resource_xml.S dependencies
+file(
+    GLOB xml_files
+    Common/Data/Dialogs/*.xml
+)
+
+set_source_files_properties (
+    Common/Source/Resource/resource_xml.S
+     PROPERTIES OBJECT_DEPENDS "${xml_files}"
+)
+
+# resource_data.S dependencies
+file(
+    GLOB data_files
+    Common/Data/Bitmaps/egm96s.dem
+)
+
+set_source_files_properties (
+    Common/Source/Resource/resource_data.S
+     PROPERTIES OBJECT_DEPENDS "${data_files}"
+)
+
 
 target_include_directories( LK8000 PRIVATE
     Common/Header/linuxcompat

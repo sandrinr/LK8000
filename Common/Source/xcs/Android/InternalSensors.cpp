@@ -182,7 +182,6 @@ Java_org_LK8000_InternalGPS_setConnected(JNIEnv *env, jobject obj,
 {
 
   unsigned index = getDeviceIndex(env, obj);
-  LockComm();
   PDeviceDescriptor_t pdev = devX(index);
   if(pdev) {
     pdev->HB = LKHearthBeats;
@@ -207,7 +206,6 @@ Java_org_LK8000_InternalGPS_setConnected(JNIEnv *env, jobject obj,
     }
     GPS_INFO.NAVWarning = !(pdev->nmeaParser.gpsValid);
   }
-  UnlockComm();
 }
 
 extern "C"
@@ -232,7 +230,8 @@ Java_org_LK8000_InternalGPS_setLocation(JNIEnv *env, jobject obj,
   if(pdev && pdev->nmeaParser.activeGPS) {
 
     const time_t utcTime = time/1000;
-    struct tm* utc = gmtime(&utcTime);
+    struct tm tm_temp = {0};
+    struct tm* utc = gmtime_r(&utcTime, &tm_temp);
 
     GPS_INFO.Time = utc->tm_hour * 3600 + utc->tm_min * 60 + utc->tm_sec;
     GPS_INFO.Year = utc->tm_year + 1900;
@@ -385,6 +384,6 @@ Java_org_LK8000_NonGPSSensors_setBarometricPressure(
                                                 kalman_filter.GetXVel());
 #endif
 
-    UpdateBaroSource(&GPS_INFO, 0, pdev, StaticPressureToAltitude(kalman_filter.GetXAbs() * 100));
+    UpdateBaroSource(&GPS_INFO, 0, pdev, StaticPressureToQNHAltitude(kalman_filter.GetXAbs() * 100));
   }
 }

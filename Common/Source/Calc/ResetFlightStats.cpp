@@ -15,17 +15,6 @@ extern double CRUISE_EFFICIENCY;
 extern AATDistance aatdistance;
 
 
-
-#ifdef GTL2
-void ClearGTL2(void) {
-  for (int i=0; i<=NUMTERRAINSWEEPS; i++) {
-    GlideFootPrint2[i].x = 0;
-    GlideFootPrint2[i].y = 0;
-  }
-}
-#endif
-
-
 //
 // This is called only by calculations thread, at init, at restart of a replay flight, and also on takeoff
 // IT SHOULD NEVER HAPPEN DURING REAL FLIGHT, AFTER TAKEOFF!
@@ -90,14 +79,13 @@ void ResetFlightStats(NMEA_INFO *Basic, DERIVED_INFO *Calculated) {
       Calculated->AverageClimbRateN[i]= 0;
     }
 
-    for (i=0; i<=NUMTERRAINSWEEPS; i++) {
-      Calculated->GlideFootPrint[i].x = 0;
-      Calculated->GlideFootPrint[i].y = 0;
-    }
-    #ifdef GTL2
-    ClearGTL2(); // clear GlideFootPrint2
-    #endif
+    Calculated->GlideFootPrint_valid = false;
+    Calculated->GlideFootPrint2_valid = false;
     
+    std::fill(std::begin(Calculated->GlideFootPrint), std::end(Calculated->GlideFootPrint), (pointObj){0.,0.,0.});
+    std::fill(std::begin(Calculated->GlideFootPrint2), std::end(Calculated->GlideFootPrint2), (pointObj){0.,0.,0.});
+
+
     Calculated->TerrainWarningLatitude = 0.0;
     Calculated->TerrainWarningLongitude = 0.0;
 

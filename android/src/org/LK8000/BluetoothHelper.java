@@ -27,6 +27,8 @@ import java.util.UUID;
 import java.util.Set;
 import java.io.IOException;
 
+import android.os.Build;
+import android.support.annotation.RequiresApi;
 import android.util.Log;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -70,7 +72,12 @@ final class BluetoothHelper {
   }
 
   public static boolean isEnabled() {
-    return adapter != null && adapter.isEnabled();
+    try {
+      return adapter != null && adapter.isEnabled();
+    } catch (Exception e) {
+      Log.e(TAG, "BluetoothAdapter.isEnabled() failed", e);
+    }
+    return false;
   }
 
   /**
@@ -106,24 +113,31 @@ final class BluetoothHelper {
     if (adapter == null)
       return null;
 
-    Set<BluetoothDevice> devices = adapter.getBondedDevices();
-    if (devices == null)
+    try {
+      Set<BluetoothDevice> devices = adapter.getBondedDevices();
+      if (devices == null)
+        return null;
+
+      String[] addresses = new String[devices.size() * 2];
+      int n = 0;
+      for (BluetoothDevice device : devices) {
+        addresses[n++] = device.getAddress();
+        addresses[n++] = device.getName();
+      }
+
+      return addresses;
+    } catch (Exception e) {
+      Log.e(TAG, "Failed to get bluetooth devices list" , e);
       return null;
-
-    String[] addresses = new String[devices.size() * 2];
-    int n = 0;
-    for (BluetoothDevice device: devices) {
-      addresses[n++] = device.getAddress();
-      addresses[n++] = device.getName();
     }
-
-    return addresses;
   }
 
+  @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR2)
   public static boolean startLeScan(BluetoothAdapter.LeScanCallback cb) {
     return hasLe && adapter.startLeScan(cb);
   }
 
+  @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR2)
   public static void stopLeScan(BluetoothAdapter.LeScanCallback cb) {
     if (hasLe)
       adapter.stopLeScan(cb);

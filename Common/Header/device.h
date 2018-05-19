@@ -13,9 +13,9 @@
 #define	NUMDEV		 6
 
 #ifdef RADIO_ACTIVE
-#define	NUMREGDEV	 40 // Max number of registered devices
+#define	NUMREGDEV	 41 // Max number of registered devices
 #else
-#define	NUMREGDEV	 36 // Max number of registered devices
+#define	NUMREGDEV	 37 // Max number of registered devices
 #endif // RADIO_ACTIVE
 
 #define	devA()	    (&DeviceList[0])
@@ -73,7 +73,15 @@ typedef struct Declaration {
   const WAYPOINT *waypoint[MAXTASKPOINTS];
 } Declaration_t;
 
-typedef	struct DeviceDescriptor_t{
+typedef	struct DeviceDescriptor_t {
+  
+  DeviceDescriptor_t() = default;
+  
+  DeviceDescriptor_t(DeviceDescriptor_t&) = delete;
+  DeviceDescriptor_t(DeviceDescriptor_t&&) = delete;
+  DeviceDescriptor_t& operator= (DeviceDescriptor_t&) = delete;
+  DeviceDescriptor_t& operator= (DeviceDescriptor_t&&) = delete;
+  
   ComPort *Com;
   TCHAR	Name[DEVNAMESIZE+1];
 
@@ -135,7 +143,9 @@ typedef	struct{
   BOOL   (*Installer)(PDeviceDescriptor_t d);
 } DeviceRegister_t;
 
-
+#ifdef ANDROID
+extern Mutex COMMPort_mutex; // needed for Bluetooth LE scan
+#endif
 extern COMMPort_t COMMPort;
 
 extern DeviceDescriptor_t	DeviceList[NUMDEV];
@@ -152,13 +162,7 @@ PDeviceDescriptor_t devX(unsigned idx) {
 	return nullptr;
 }
 
-#if USELKASSERT
- #define LockComm() LockComm_d(_T(__FILE__), __LINE__)
- void LockComm_d(const TCHAR* filename, int line);
-#else
 void LockComm();
-#endif
-
 void UnlockComm();
 
 void RefreshComPortList();
