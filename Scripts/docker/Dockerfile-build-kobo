@@ -1,0 +1,20 @@
+FROM ubuntu:xenial
+
+# Install prerequisites
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends sudo wget \
+        ca-certificates pkg-config build-essential crossbuild-essential-armhf \
+        gawk xsltproc imagemagick ttf-dejavu fakeroot zip && \
+    apt-get clean && \
+    rm -rf /tmp/* /var/tmp/* /var/lib/apt/lists/* /var/log/*
+
+# Compile LK8000 dependencies
+COPY kobo-toolchain-install.sh /root/kobo-toolchain-install.sh
+RUN BUILD_DIR=/tmp/kobo TC=arm-linux-gnueabihf root/kobo-toolchain-install.sh && \
+    rm -rf /tmp/kobo
+
+# Setup build environment
+RUN mkdir /lk8000 && chown nobody:nogroup /lk8000
+RUN mkdir /nonexistent && chown nobody:nogroup /nonexistent
+WORKDIR /lk8000
+USER nobody
